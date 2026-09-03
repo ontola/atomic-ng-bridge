@@ -1,0 +1,14 @@
+{
+  "name": "atomic-ng-bridge-workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "spike": "pnpm -C apps/spike dev"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,10 @@
+node_modules
+dist
+*.tsbuildinfo
+.DS_Store
+
+# Playwright output: recordings and traces are artifacts, not source.
+e2e/artifacts/
+docs/*.mp4
+docs/*.webm
+.demo/

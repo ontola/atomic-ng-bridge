@@ -1,0 +1,14 @@
+{
+  "name": "@tomic/ng-bridge-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The demo, as a test: an Atomic app with no server, mirroring live into NextGraph",
+  "scripts": {
+    "demo": "playwright test",
+    "demo:video": "playwright test && node scripts/collect-video.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0"
+  }
+}

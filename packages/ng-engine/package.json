@@ -1,0 +1,27 @@
+{
+  "name": "@tomic/ng-engine",
+  "version": "0.1.0",
+  "description": "NgTransport backed by @ng-org/lib-wasm: wallet, session, SPARQL, subscriptions",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./worker": {
+      "default": "./src/worker/engineWorker.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tomic/ng-bridge": "workspace:*"
+  },
+  "devDependencies": {
+    "@ng-org/lib-wasm": "0.1.2-alpha.6",
+    "@types/node": "^24.10.1"
+  },
+  "license": "MIT"
+}

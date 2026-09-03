@@ -1,0 +1,8 @@
+packages:
+  - 'packages/*'
+  - 'apps/*'
+  - 'e2e'
+
+# Build scripts pnpm may run (it blocks them by default).
+allowBuilds:
+  esbuild: true

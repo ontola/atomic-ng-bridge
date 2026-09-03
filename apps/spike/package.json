@@ -1,0 +1,21 @@
+{
+  "name": "@tomic/ng-spike",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "M0 harness: drive the NextGraph engine from a plain browser tab",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ng-org/lib-wasm": "0.1.2-alpha.6",
+    "@tomic/ng-bridge": "workspace:*",
+    "@tomic/ng-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^7.2.4",
+    "vite-plugin-wasm": "^3.5.0"
+  }
+}

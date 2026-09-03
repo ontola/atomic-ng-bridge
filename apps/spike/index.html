@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>M0 — NextGraph engine, plain tab</title>
+    <style>
+      :root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+      body { margin: 0 auto; max-width: 52rem; padding: 2rem 1rem; line-height: 1.5; }
+      h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+      p.sub { margin-top: 0; opacity: 0.75; }
+      fieldset { border: 1px solid currentColor; border-radius: 6px; margin: 1rem 0; padding: 1rem; opacity: 0.95; }
+      label { display: block; margin: 0.5rem 0 0.25rem; font-weight: 600; }
+      input { width: 100%; padding: 0.4rem; box-sizing: border-box; }
+      button { padding: 0.5rem 0.9rem; margin: 0.25rem 0.5rem 0.25rem 0; cursor: pointer; }
+      #log { white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 0.85rem;
+             border: 1px solid currentColor; border-radius: 6px; padding: 1rem; min-height: 12rem; }
+      .warn { border-left: 4px solid orange; padding-left: 0.75rem; }
+    </style>
+  </head>
+  <body>
+    <h1>M0 — driving the NextGraph engine from a plain tab</h1>
+    <p class="sub">
+      No hosted wallet page, no iframe. Everything below runs in this document,
+      against <code>@ng-org/lib-wasm</code> directly.
+    </p>
+
+    <p class="warn">
+      This page opens a real wallet file in this origin. Use a throwaway wallet.
+      The session is in-memory by default, so nothing is written to this
+      origin's storage, but the decryption itself happens in this page's code.
+    </p>
+
+    <fieldset>
+      <legend>1 · Session</legend>
+      <button id="public">Create wallet on the public broker (nextgraph.eu)</button>
+
+      <label for="invite">…or a broker invitation link</label>
+      <input id="invite" type="text" placeholder="http://localhost:14400/#/i/..." />
+      <button id="create">Create wallet from invitation &amp; start session</button>
+
+      <label for="wallet">…or an existing wallet file (<code>.ngw</code>)</label>
+      <input id="wallet" type="file" accept=".ngw,application/octet-stream" />
+      <label for="password">Wallet password</label>
+      <input id="password" type="password" autocomplete="off" />
+      <button id="open">Open wallet &amp; start session</button>
+      <button id="connect">Connect to broker</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>2 · Write, read, reload</legend>
+      <button id="write">Write a triple</button>
+      <button id="read">Read it back</button>
+      <button id="multi">Test <code>;</code>-separated update (C2)</button>
+      <button id="roundtrip">Round-trip a mapped resource</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>3 · After a reload</legend>
+      <p class="sub">
+        Reload the page, open the wallet again, then read <em>before</em>
+        connecting to a broker. That is the B1 question: does the data come back
+        from this device, or only from the broker?
+      </p>
+      <button id="readOffline">Read back without connecting</button>
+      <button id="reset">Forget the remembered document</button>
+    </fieldset>
+
+    <div id="log">Ready.</div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

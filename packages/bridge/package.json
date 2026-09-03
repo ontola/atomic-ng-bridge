@@ -1,0 +1,26 @@
+{
+  "name": "@tomic/ng-bridge",
+  "version": "0.1.0",
+  "description": "Sync layer mirroring an Atomic Data drive into a NextGraph document, and back",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./atomic": {
+      "default": "./src/atomic.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@tomic/lib": ">=0.41.0-beta.2"
+  },
+  "devDependencies": {
+    "@tomic/lib": "link:../../../atomic-server/browser/lib"
+  },
+  "license": "MIT"
+}
