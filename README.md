@@ -3,6 +3,8 @@
 An Atomic Data app, running with no server, whose data lives continuously in a NextGraph document
 as ordinary RDF — and comes back the other way.
 
+[Related PR to atomic-server](https://github.com/ontola/atomic-server/pull/1360).
+
 Built for ELFA's WP6 question: can Atomic's mature Tables / Forms / Kanban work *on* NextGraph
 without rebuilding them, and without anyone hosting anything?
 
