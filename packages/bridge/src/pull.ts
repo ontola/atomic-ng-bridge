@@ -11,11 +11,27 @@
  * behave normally, with no special-casing for bridged data.
  */
 
+import {
+  type AliasMap,
+  isDriveResource,
+  ngSubjectFor,
+  unaliasResourceTriples,
+} from './alias.js';
 import { contentHash } from './canonical.js';
 import { triplesToPropVals } from './mapping.js';
 import type { CursorStore, NgTransport } from './ports.js';
-import { selectSubjectQuery, selectSubjectsQuery } from './sparql.js';
+import {
+  selectAliasesQuery,
+  selectSubjectQuery,
+  selectSubjectsQuery,
+} from './sparql.js';
 import type { DatatypeResolver, MappingWarning } from './types.js';
+import { bridge } from './vocab.js';
+
+/** A transport that can read one variable out of a query. The engine's can. */
+type ValueTransport = NgTransport & {
+  queryValues?: (sparql: string, variable: string) => Promise<string[]>;
+};
 
 /** The Atomic side, as the pull direction needs it. */
 export type AtomicSink = {
@@ -116,12 +132,22 @@ export function createPuller(options: PullerOptions): Puller {
   let missedWhileRunning = false;
 
   const pullSubject = async (
-    subject: string,
+    requested: string,
+    aliases: AliasMap,
     result: PullResult,
   ): Promise<void> => {
-    const triples = await transport.query(selectSubjectQuery(graph, subject));
+    // Callers may name either side: the document lists NextGraph subjects, a
+    // local caller knows the Atomic one. The document is read by the former;
+    // cursors and the sink work with the latter (alias.ts).
+    const ngSubject = isDriveResource(requested)
+      ? ngSubjectFor(requested, graph)
+      : requested;
+    const raw = await transport.query(selectSubjectQuery(graph, ngSubject));
 
-    if (triples.length === 0) {
+    if (raw.length === 0) {
+      const subject = isDriveResource(requested)
+        ? requested
+        : (aliases.get(ngSubject) ?? ngSubject);
       const known = await cursors.get(subject);
 
       // Nothing in the graph. Only meaningful if we had something there before:
@@ -140,7 +166,10 @@ export function createPuller(options: PullerOptions): Puller {
       return;
     }
 
-    const hash = contentHash(triples);
+    // Hash the document's own terms, before mapping links back: this is what
+    // the push side hashes too, so a pulled write is not pushed again.
+    const hash = contentHash(raw);
+    const { subject, triples } = unaliasResourceTriples(ngSubject, raw, aliases);
 
     if ((await cursors.get(subject))?.hash === hash) {
       // Already applied, or we pushed exactly this. Either way, nothing to do,
@@ -151,7 +180,9 @@ export function createPuller(options: PullerOptions): Puller {
     }
 
     const predicates = [...new Set(triples.map(triple => triple.predicate))];
-    await sink.warmDatatypes?.(predicates);
+    await sink.warmDatatypes?.(
+      predicates.filter(predicate => predicate !== bridge.atomicSubject),
+    );
 
     const { propVals, warnings } = triplesToPropVals(triples, {
       datatypeOf: sink.datatypeOf,
@@ -172,11 +203,20 @@ export function createPuller(options: PullerOptions): Puller {
 
   const run = async (subjects: string[]): Promise<PullResult> => {
     const result = emptyResult();
+    const wanted = subjects.filter(shouldPull);
+    const aliases =
+      wanted.length === 0
+        ? new Map()
+        : await loadAliases(transport, graph, error =>
+            onError?.({ subject: graph, error }),
+          );
 
-    for (const subject of subjects.filter(shouldPull)) {
+    for (const listed of wanted) {
       try {
-        await pullSubject(subject, result);
+        await pullSubject(listed, aliases, result);
       } catch (error) {
+        // Reported under the Atomic subject, like every other outcome.
+        const subject = aliases.get(listed) ?? listed;
         result.failed.push(subject);
         onError?.({ subject, error });
       }
@@ -263,7 +303,7 @@ export function createPuller(options: PullerOptions): Puller {
  * transport can) should implement `queryValues`.
  */
 async function listSubjects(
-  transport: NgTransport & { queryValues?: (sparql: string, variable: string) => Promise<string[]> },
+  transport: ValueTransport,
   graph: string,
 ): Promise<string[]> {
   const sparql = selectSubjectsQuery(graph);
@@ -277,4 +317,37 @@ async function listSubjects(
   const triples = await transport.query(sparql);
 
   return [...new Set(triples.map(triple => triple.subject))];
+}
+
+/**
+ * Reads every alias record in the document, in one query, so links between
+ * mirrored resources map back to Atomic subjects without a query per link.
+ *
+ * If the read fails the map is empty rather than the pull aborted: a subject's
+ * own origin is still read from its triples, so the resource itself lands
+ * under the right Atomic subject; only links to other aliased subjects would
+ * then stay as NextGraph IRIs until the next successful pull.
+ */
+async function loadAliases(
+  transport: NgTransport,
+  graph: string,
+  onError: (error: unknown) => void,
+): Promise<AliasMap> {
+  const aliases = new Map<string, string>();
+
+  try {
+    const rows = await transport.query(
+      selectAliasesQuery(graph, bridge.atomicSubject),
+    );
+
+    for (const row of rows) {
+      if (row.object.termType === 'iri') {
+        aliases.set(row.predicate, row.object.value);
+      }
+    }
+  } catch (error) {
+    onError(error);
+  }
+
+  return aliases;
 }

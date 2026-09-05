@@ -18,6 +18,7 @@
  *   halves of one replace against the same engine.
  */
 
+import { aliasResourceTriples, ngSubjectFor } from './alias.js';
 import { contentHash } from './canonical.js';
 import { resourceToTriples } from './mapping.js';
 import type {
@@ -128,6 +129,9 @@ export function createPusher(options: PusherOptions): Pusher {
     const snapshot = await source.getSnapshot(subject);
 
     const previous = await cursors.get(subject);
+    // The document knows this resource by its NextGraph subject (alias.ts);
+    // cursors stay keyed by the Atomic one, which is what the source reports.
+    const ngSubject = ngSubjectFor(subject, graph);
 
     if (snapshot === undefined) {
       // Gone locally. The mirror of that is removing what we put there, and
@@ -135,8 +139,8 @@ export function createPusher(options: PusherOptions): Pusher {
       // not ours to delete. With no cursor we know of nothing we wrote, so
       // there is nothing to remove.
       const update = preserveForeignPredicates
-        ? deletePredicatesUpdate(graph, subject, previous?.predicates ?? [])
-        : deleteSubjectUpdate(graph, subject);
+        ? deletePredicatesUpdate(graph, ngSubject, previous?.predicates ?? [])
+        : deleteSubjectUpdate(graph, ngSubject);
 
       if (update !== '') {
         await transport.update(update);
@@ -148,15 +152,18 @@ export function createPusher(options: PusherOptions): Pusher {
       return;
     }
 
-    const { triples, warnings } = resourceToTriples(subject, snapshot.propVals, {
+    const mapped = resourceToTriples(subject, snapshot.propVals, {
       datatypeOf: snapshot.datatypeOf,
       emitRdfType,
     });
 
-    for (const warning of warnings) {
+    for (const warning of mapped.warnings) {
       onWarning?.(warning);
     }
 
+    // Hash what the document will hold, alias record included: the pull side
+    // hashes what it reads back, and the two must agree for echo suppression.
+    const { triples } = aliasResourceTriples(subject, mapped.triples, graph);
     const hash = contentHash(triples);
 
     if (previous?.hash === hash) {
@@ -174,11 +181,11 @@ export function createPusher(options: PusherOptions): Pusher {
 
     if (supportsMultiOperationUpdate) {
       await transport.update(
-        replaceSubjectUpdate(graph, subject, triples, { deleteOnlyPredicates }),
+        replaceSubjectUpdate(graph, ngSubject, triples, { deleteOnlyPredicates }),
       );
     } else {
       await runUpdates(
-        replaceSubjectSteps(graph, subject, triples, { deleteOnlyPredicates }),
+        replaceSubjectSteps(graph, ngSubject, triples, { deleteOnlyPredicates }),
       );
     }
 

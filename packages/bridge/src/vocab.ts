@@ -46,6 +46,11 @@ export const bridge = {
   loroDoc: `${BRIDGE_NS}loroDoc`,
   /** An Atomic nested resource, serialized as JSON-AD. See mapping.ts. */
   nestedResource: `${BRIDGE_NS}nestedResource`,
+  /**
+   * One triple per aliased subject: the `did:ad:` subject this NextGraph
+   * subject stands for. See alias.ts. Never becomes a property locally.
+   */
+  atomicSubject: `${BRIDGE_NS}atomicSubject`,
 } as const;
 
 /** Atomic datatype URIs. Copied deliberately: the mapping core stays dependency-free. */

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   AtomicDatatype,
+  aliasResourceTriples,
+  bridge as vocab,
   createBridge,
   createMemoryCursorStore,
   resourceToTriples,
@@ -14,6 +16,15 @@ const GRAPH = 'did:ng:o:doc-1';
 const SUBJECT = 'did:ad:resource:1';
 const NAME = 'https://atomicdata.dev/properties/name';
 const datatypeOf = () => AtomicDatatype.STRING;
+
+/** What the document holds for SUBJECT: NextGraph subject, alias record included. */
+const mirrored = (propVals: Record<string, unknown>) =>
+  aliasResourceTriples(
+    SUBJECT,
+    resourceToTriples(SUBJECT, propVals, { datatypeOf }).triples,
+    GRAPH,
+  );
+const NG_SUBJECT = mirrored({}).subject;
 
 /**
  * A NextGraph document and an Atomic store, both in memory, wired to the same
@@ -29,10 +40,7 @@ function harness(options: {
   let notifyLocal: ((subject: string) => void) | undefined;
 
   if (options.ngState !== undefined) {
-    ng.set(
-      SUBJECT,
-      resourceToTriples(SUBJECT, options.ngState, { datatypeOf }).triples,
-    );
+    ng.set(NG_SUBJECT, mirrored(options.ngState).triples);
   }
 
   if (options.localState !== undefined) {
@@ -43,7 +51,21 @@ function harness(options: {
     queryValues: (sparql: string, variable: string) => Promise<string[]>;
   } = {
     query: async sparql => {
-      const match = /<(did:ad:[^>]+)> \?p \?o/.exec(sparql);
+      if (sparql.includes(`?p <${vocab.atomicSubject}> ?o`)) {
+        // The alias listing: every origin record, as `?p` (NextGraph subject)
+        // and `?o` (Atomic subject) bindings.
+        return [...ng.values()].flatMap(triples =>
+          triples
+            .filter(triple => triple.predicate === vocab.atomicSubject)
+            .map(triple => ({
+              subject: '',
+              predicate: triple.subject,
+              object: triple.object,
+            })),
+        );
+      }
+
+      const match = /<([^>]+)> \?p \?o/.exec(sparql);
 
       return match === null ? [] : (ng.get(match[1]!) ?? []);
     },
@@ -54,10 +76,7 @@ function harness(options: {
       const value = /"([^"]*)"/.exec(sparql)?.[1];
 
       if (value !== undefined && sparql.includes('INSERT')) {
-        ng.set(
-          SUBJECT,
-          resourceToTriples(SUBJECT, { [NAME]: value }, { datatypeOf }).triples,
-        );
+        ng.set(NG_SUBJECT, mirrored({ [NAME]: value }).triples);
       }
     },
     subscribe: async () => ({ close: () => undefined }),

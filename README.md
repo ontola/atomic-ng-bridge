@@ -22,9 +22,10 @@ Working, demonstrated, and honest about its edges.
 - **The app runs with no AtomicServer.** Real Tables, Forms, Kanban, runtime schema editing,
   version history — the shipping product, over a local-only drive.
 - **Its data is in NextGraph, as ordinary RDF.** Atomic property URIs *are* the predicates, every
-  resource carries `isA` **and** `rdf:type` so a native `?s a <Class>` query works, and a property
-  from a user-defined ontology round-trips with no configuration. No parallel vocabulary, no
-  translation layer, nothing to keep in sync.
+  subject is a NextGraph IRI under the document (`did:ng:o:<doc>:q:…`, the shape the NG ORM mints),
+  every resource carries `isA` **and** `rdf:type` so a native `?s a <Class>` query works, and a
+  property from a user-defined ontology round-trips with no configuration. No parallel vocabulary,
+  no translation layer, nothing to keep in sync.
 - **Both directions.** Local edits reach the document; writes made into the document reach the app.
   Push and pull share one content-hash cursor, which is what stops them feeding each other.
 - **One secret.** The Atomic signing key is derived from the user's NextGraph wallet, so there is no

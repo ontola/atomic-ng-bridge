@@ -25,7 +25,12 @@ import {
   createAtomicStoreSink,
   createAtomicStoreSource,
 } from '@tomic/ng-bridge/atomic';
-import { createBridge, createIdbCursorStore, type Bridge } from '@tomic/ng-bridge';
+import {
+  createBridge,
+  createIdbCursorStore,
+  documentPrefix,
+  type Bridge,
+} from '@tomic/ng-bridge';
 import type {
   NgEngineApi,
   NgEngineTransport,
@@ -237,11 +242,13 @@ export async function attachNgBridge(
       },
     }),
     sink: createAtomicStoreSink({ store, drive }),
-    // NextGraph-native subjects (`did:ng:…`) are not ours to materialize as
-    // Atomic resources: the document's own marker triple is one, and anything a
-    // NextGraph-native app writes with its own subjects would be another. We
-    // mirror Atomic subjects, and read the rest as data.
-    shouldPull: subject => !subject.startsWith('did:ng:'),
+    // Every mirrored resource sits under this document as
+    // `did:ng:o:<doc>:q:…` (alias.ts), and so does anything a NextGraph-native
+    // app creates in it, which we then materialize under that same subject.
+    // Not ours: the document's own marker triple, whose subject is the bare
+    // document nuri, and subjects belonging to some other document.
+    shouldPull: subject =>
+      subject.startsWith(`${documentPrefix(document.nuri)}:q:`),
     onWarning: warning =>
       report(`${warning.kind}: ${warning.property} (${warning.subject})`),
   });

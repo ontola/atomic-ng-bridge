@@ -113,10 +113,12 @@ async function installOverlay(page: Page): Promise<void> {
       // Two queries, never one per subject: an N+1 sweep through a wasm engine
       // on the main thread froze the tab this is filming.
       //
-      // Rows are the subjects typed as a class the workspace itself defines,
-      // which is what `did:ad:` in the type says. A table brings its class,
-      // properties and views along too; those are in the count, but the point
-      // is to watch rows arrive, not to read the schema.
+      // Rows are the subjects typed as a class the workspace itself defines.
+      // Such a class is a mirrored resource, so its IRI sits under this
+      // document (`did:ng:o:<doc>:q:`), unlike the built-in classes under
+      // atomicdata.dev. A table brings its class, properties and views along
+      // too; those are in the count, but the point is to watch rows arrive,
+      // not to read the schema.
       const [subjects, rows] = await Promise.all([
         bridge.transport.queryValues(
           `SELECT DISTINCT ?s WHERE { GRAPH <${bridge.graph}> { ?s ?p ?o } }`,
@@ -126,7 +128,7 @@ async function installOverlay(page: Page): Promise<void> {
           `SELECT ?o WHERE { GRAPH <${bridge.graph}> {
              ?s <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?class .
              ?s <https://atomicdata.dev/properties/name> ?o
-             FILTER(STRSTARTS(str(?class), "did:ad:")) } }`,
+             FILTER(STRSTARTS(str(?class), "did:ng:o:")) } }`,
           'o',
         ),
       ]);
@@ -187,6 +189,33 @@ const subjectNamed = (page: Page, value: string): Promise<string | undefined> =>
 
     return found[0];
   }, [value]);
+
+/**
+ * The subject the app knows this NextGraph subject as. A mirrored resource is
+ * written under a NextGraph IRI (`did:ng:o:<doc>:q:…`) and keeps its Atomic
+ * subject locally; the document records the link, one triple per subject.
+ */
+const atomicSubjectOf = (page: Page, ngSubject: string): Promise<string> =>
+  page.evaluate(async ([s]) => {
+    const bridge = (
+      window as unknown as {
+        __ngBridge: {
+          graph: string;
+          transport: {
+            queryValues: (q: string, v: string) => Promise<string[]>;
+          };
+        };
+      }
+    ).__ngBridge;
+
+    const found = await bridge.transport.queryValues(
+      `SELECT ?a WHERE { GRAPH <${bridge.graph}> {
+         <${s}> <https://atomicdata.dev/ng-bridge/atomicSubject> ?a } }`,
+      'a',
+    );
+
+    return found[0] ?? (s as string);
+  }, [ngSubject]);
 
 /** A cell in the grid: rows and columns are 1-based, and column 1 is the row number. */
 const cell = (page: Page, row: number, column: number) =>
@@ -316,7 +345,12 @@ test('sign in with NextGraph, then mirror a table both ways', async ({
     )
     .toBe(true);
 
+  // In the document the row is a NextGraph subject; the write below targets
+  // that. The app still knows the row by its Atomic subject, which is what the
+  // read-back at the end asks the store for.
   const dune = (await subjectNamed(page, BOOKS[0][0]))!;
+  expect(dune).toMatch(/^did:ng:o:[A-Za-z0-9_-]+:q:[A-Za-z0-9_-]{44}$/);
+  const duneLocally = await atomicSubjectOf(page, dune);
 
   await caption(
     page,
@@ -358,7 +392,7 @@ test('sign in with NextGraph, then mirror a table both ways', async ({
       async () => {
         await refresh(page);
 
-        return nameOf(page, dune);
+        return nameOf(page, duneLocally);
       },
       { timeout: 120_000, intervals: [2000] },
     )

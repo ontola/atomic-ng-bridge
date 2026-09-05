@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   AtomicDatatype,
+  aliasResourceTriples,
+  bridge as vocab,
   createMemoryCursorStore,
   createPuller,
   createPusher,
@@ -27,11 +29,13 @@ const datatypeOf = (property: string) => datatypes[property];
 function fakeGraph(initial: Record<string, Record<string, unknown>> = {}) {
   const documents = new Map<string, Triple[]>();
 
+  // What a push leaves in the document: NextGraph subject, alias record
+  // included (alias.ts). A native app's own resource has a `did:ng:` subject
+  // already and is stored as is.
   const setSubject = (subject: string, propVals: Record<string, unknown>) => {
-    documents.set(
-      subject,
-      resourceToTriples(subject, propVals, { datatypeOf }).triples,
-    );
+    const mapped = resourceToTriples(subject, propVals, { datatypeOf }).triples;
+    const stored = aliasResourceTriples(subject, mapped, GRAPH);
+    documents.set(stored.subject, stored.triples);
   };
 
   for (const [subject, propVals] of Object.entries(initial)) {
@@ -45,7 +49,21 @@ function fakeGraph(initial: Record<string, Record<string, unknown>> = {}) {
     queryValues: (sparql: string, variable: string) => Promise<string[]>;
   } = {
     query: async sparql => {
-      const match = /<(did:ad:[^>]+)> \?p \?o/.exec(sparql);
+      if (sparql.includes(`?p <${vocab.atomicSubject}> ?o`)) {
+        // The alias listing: every origin record, as `?p` (NextGraph subject)
+        // and `?o` (Atomic subject) bindings.
+        return [...documents.values()].flatMap(triples =>
+          triples
+            .filter(triple => triple.predicate === vocab.atomicSubject)
+            .map(triple => ({
+              subject: '',
+              predicate: triple.subject,
+              object: triple.object,
+            })),
+        );
+      }
+
+      const match = /<([^>]+)> \?p \?o/.exec(sparql);
 
       return match === null ? [] : (documents.get(match[1]!) ?? []);
     },
@@ -72,7 +90,7 @@ function fakeGraph(initial: Record<string, Record<string, unknown>> = {}) {
       notify?.();
     },
     remove: (subject: string) => {
-      documents.delete(subject);
+      documents.delete(aliasResourceTriples(subject, [], GRAPH).subject);
       notify?.();
     },
     isClosed: () => closed,
@@ -203,7 +221,7 @@ describe('scope', () => {
       sink: sink.sink,
       transport: graph.transport,
       cursors: createMemoryCursorStore(),
-      shouldPull: subject => subject.startsWith('did:ad:'),
+      shouldPull: subject => subject !== 'did:ng:o:someone-elses-subject',
     });
 
     await puller.pullAll();
@@ -380,7 +398,11 @@ describe('push and pull together', () => {
     });
 
     // Pretend a pull had applied an older version a moment ago.
-    const older = resourceToTriples(SUBJECT, { [P('name')]: 'older' }, { datatypeOf });
+    const older = aliasResourceTriples(
+      SUBJECT,
+      resourceToTriples(SUBJECT, { [P('name')]: 'older' }, { datatypeOf }).triples,
+      GRAPH,
+    );
     await cursors.set(SUBJECT, {
       hash: (await import('../src/canonical.js')).contentHash(older.triples),
       predicates: [P('name')],

@@ -167,6 +167,19 @@ export function selectSubjectQuery(graph: string, subject: string): string {
   ].join('\n');
 }
 
+/**
+ * Lists every alias record in the graph, shaped as `?p ?o` bindings so the
+ * generic `query` reads it like any subject query: `?p` is the NextGraph
+ * subject, `?o` the Atomic one. One query for the whole document.
+ */
+export function selectAliasesQuery(graph: string, predicate: string): string {
+  return [
+    `SELECT ?p ?o WHERE {`,
+    `  GRAPH ${serializeIri(graph)} { ?p ${serializeIri(predicate)} ?o }`,
+    `}`,
+  ].join('\n');
+}
+
 /** Lists the distinct subjects in a graph, for a full pull. */
 export function selectSubjectsQuery(graph: string): string {
   return [

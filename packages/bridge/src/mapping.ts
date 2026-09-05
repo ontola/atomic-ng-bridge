@@ -328,6 +328,10 @@ export function triplesToPropVals(
       continue; // Derived from `isA` on the way out; never read back.
     }
 
+    if (triple.predicate === bridge.atomicSubject) {
+      continue; // The subject's own alias record (alias.ts); not a property.
+    }
+
     if (triple.predicate === bridge.arrayOrder) {
       if (triple.object.termType === 'literal') {
         order = JSON.parse(triple.object.value) as Record<string, string[]>;

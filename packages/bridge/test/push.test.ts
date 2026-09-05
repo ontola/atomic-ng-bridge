@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   AtomicDatatype,
+  aliasResourceTriples,
+  bridge,
   contentHash,
   createMemoryCursorStore,
   createPusher,
@@ -176,8 +178,11 @@ describe('pushing a changed resource', () => {
     expect(result.deleted).toEqual(['did:ad:resource:1']);
     expect(t.updates).toHaveLength(1);
     expect(t.updates[0]).toContain('DELETE');
-    // Scoped to what we wrote, so a native app's own predicates survive.
-    expect(t.updates[0]).toContain(`VALUES ?p { <${P('name')}> }`);
+    // Scoped to what we wrote, so a native app's own predicates survive. The
+    // alias record (alias.ts) is ours too, and goes with the resource.
+    expect(t.updates[0]).toContain(
+      `VALUES ?p { <${bridge.atomicSubject}> <${P('name')}> }`,
+    );
     // The cursor goes too, so re-creating the resource is seen as a change.
     expect(await t.cursors.get('did:ad:resource:1')).toBeUndefined();
   });
@@ -288,9 +293,11 @@ describe('echo suppression', () => {
     // What the pull side would do: apply NextGraph's state locally, then record
     // the hash of exactly what it applied.
     const propVals = { [P('name')]: 'from nextgraph' };
-    const { triples } = resourceToTriples('did:ad:resource:1', propVals, {
-      datatypeOf,
-    });
+    const { triples } = aliasResourceTriples(
+      'did:ad:resource:1',
+      resourceToTriples('did:ad:resource:1', propVals, { datatypeOf }).triples,
+      GRAPH,
+    );
     await t.cursors.set('did:ad:resource:1', {
       hash: contentHash(triples),
       predicates: [...new Set(triples.map(t2 => t2.predicate))],
@@ -309,9 +316,11 @@ describe('echo suppression', () => {
     t.pusher.start();
 
     const pulled = { [P('name')]: 'from nextgraph' };
-    const { triples } = resourceToTriples('did:ad:resource:1', pulled, {
-      datatypeOf,
-    });
+    const { triples } = aliasResourceTriples(
+      'did:ad:resource:1',
+      resourceToTriples('did:ad:resource:1', pulled, { datatypeOf }).triples,
+      GRAPH,
+    );
     await t.cursors.set('did:ad:resource:1', {
       hash: contentHash(triples),
       predicates: [...new Set(triples.map(t2 => t2.predicate))],

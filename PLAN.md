@@ -204,9 +204,23 @@ access.
 
 ### Subjects
 
-Atomic subjects are already IRIs (`did:ad:...` for local drives, or `https://...`). They stay
-verbatim as RDF subjects inside the NextGraph graph. IRIs are opaque; there is no need to remint
-them, and keeping them makes round-tripping exact.
+An Atomic resource in a local drive is `did:ad:<signature>`: its subject is the signature of the
+commit that created it, so it exists only once that commit is signed. A NextGraph subject is
+`did:ng:o:<docId>:q:<random>`, the document nuri plus an opaque suffix, which is what the NG ORM
+mints for a new object. Neither can be made equal to the other. The bridge keeps the Atomic subject
+locally and writes the document under a NextGraph one, derived rather than stored:
+
+    did:ad:X  ->  did:ng:o:<docId>:q:<base64url(sha256(X) ++ 1 byte)>
+
+Forty-four characters, the shape of the ORM's own subjects, so a native app sees nothing but
+NextGraph IRIs. Every link to another resource in the drive (relations, array members, classes
+under `isA` and `rdf:type`) is rewritten the same way, so links between rows are NextGraph subjects
+too. One extra triple per subject, `<ng> bridge:atomicSubject <did:ad:X>`, records the origin; the
+pull side reads all of those in one query and maps back. Agents, devices and commits are `did:ad:`
+too, but they are identities and history rather than resources in the document, and stay as they
+are. A resource a native app creates already has a `did:ng:` subject; that is its Atomic subject
+as well, in both directions. All of this lives in `packages/bridge/src/alias.ts`; the mapping and
+the Atomic side never see it.
 
 ### Datatypes
 

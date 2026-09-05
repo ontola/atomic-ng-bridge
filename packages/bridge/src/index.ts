@@ -3,6 +3,7 @@ export * from './vocab.js';
 export * from './mapping.js';
 export * from './sparql.js';
 export * from './canonical.js';
+export * from './alias.js';
 export * from './ports.js';
 export * from './push.js';
 export * from './pull.js';
