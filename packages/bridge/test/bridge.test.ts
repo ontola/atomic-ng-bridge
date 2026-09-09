@@ -33,6 +33,8 @@ const NG_SUBJECT = mirrored({}).subject;
 function harness(options: {
   ngState?: Record<string, unknown>;
   localState?: Record<string, unknown>;
+  /** Let the source list its resources, as the app's does from the local DB. */
+  listSubjects?: boolean;
 }) {
   const events: string[] = [];
   const ng = new Map<string, Triple[]>();
@@ -86,6 +88,9 @@ function harness(options: {
   };
 
   const source: AtomicSource = {
+    listSubjects: options.listSubjects
+      ? async () => [...local.keys()]
+      : undefined,
     onChanged: callback => {
       notifyLocal = callback;
 
@@ -118,6 +123,7 @@ function harness(options: {
     events,
     ng,
     local,
+    source,
     editLocally: (propVals: Record<string, unknown>) => {
       local.set(SUBJECT, propVals);
       notifyLocal?.(SUBJECT);
@@ -261,5 +267,57 @@ describe('lifecycle', () => {
     expect((broken.status.lastError!.error as Error).message).toBe(
       'connection lost',
     );
+  });
+});
+
+describe('starting with existing state', () => {
+  it('pushes an edit made while the mirror was not running, with no change event', async () => {
+    // Edited offline, then the tab was reloaded: the push queue is gone and
+    // no event will fire for this resource again until it is touched.
+    const t = harness({
+      localState: { [NAME]: 'edited while offline' },
+      listSubjects: true,
+    });
+
+    await t.bridge.start();
+
+    expect(t.events).toContain('ng-write');
+    expect(t.ng.get(NG_SUBJECT)?.some(triple => triple.object.value === 'edited while offline')).toBe(true);
+  });
+
+  it('writes nothing on a restart when the document already has everything', async () => {
+    const t = harness({
+      localState: { [NAME]: 'same' },
+      listSubjects: true,
+    });
+
+    await t.bridge.start();
+    await t.bridge.stop();
+    const writes = t.events.filter(event => event === 'ng-write').length;
+
+    await t.bridge.start();
+
+    expect(t.events.filter(event => event === 'ng-write').length).toBe(writes);
+  });
+
+  it('still starts when the listing fails', async () => {
+    const t = harness({ localState: { [NAME]: 'x' }, listSubjects: true });
+    (t.source as { listSubjects?: () => Promise<string[]> }).listSubjects =
+      async () => {
+        throw new Error('ClientDb unavailable');
+      };
+
+    await t.bridge.start();
+
+    expect(t.bridge.status.running).toBe(true);
+    expect(t.bridge.status.lastError?.direction).toBe('push');
+  });
+
+  it('does not sweep when the source cannot list', async () => {
+    const t = harness({ localState: { [NAME]: 'x' } });
+
+    await t.bridge.start();
+
+    expect(t.events).not.toContain('ng-write');
   });
 });

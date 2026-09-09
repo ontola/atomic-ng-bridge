@@ -117,6 +117,47 @@ export function createAtomicStoreSource(
   const removed = new Set<string>();
 
   return {
+    listSubjects: async () => {
+      // The local database knows every subject on this device; the in-memory
+      // map only knows what has been loaded. Prefer the former.
+      let candidates: string[];
+
+      try {
+        const db = store.getClientDb?.();
+        candidates =
+          db !== undefined && typeof db.allSubjects === 'function'
+            ? await db.allSubjects()
+            : store.getAllSubjects();
+      } catch {
+        // No local database (or it failed to come up): sweep what is loaded.
+        // The mirror keeps working on change events either way.
+        candidates = store.getAllSubjects();
+      }
+
+      const mirrored: string[] = [];
+
+      for (const subject of candidates) {
+        if (removed.has(subject)) {
+          continue;
+        }
+
+        // `shouldMirror` reads the resource synchronously, so load it first;
+        // a subject that will not load in time is simply not swept now, and
+        // its next change event brings it back.
+        try {
+          await withTimeout(store.getResource(subject), snapshotTimeoutMs, subject);
+        } catch {
+          continue;
+        }
+
+        if (shouldMirror(subject)) {
+          mirrored.push(subject);
+        }
+      }
+
+      return mirrored;
+    },
+
     onChanged: callback => {
       const emit = (subject: string) => {
         if (shouldMirror(subject)) {

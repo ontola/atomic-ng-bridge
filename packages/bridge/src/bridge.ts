@@ -117,6 +117,21 @@ export function createBridge(options: BridgeOptions): Bridge {
 
       stopPush = pusher.start();
       stopPull = await puller.start();
+
+      // What changed while the mirror was not running has no change event
+      // coming. Queue everything the source knows; the pusher skips by hash
+      // whatever the document already holds. A sweep that cannot run is
+      // reported, not fatal: the mirror still follows change events.
+      try {
+        for (const subject of (await source.listSubjects?.()) ?? []) {
+          pusher.notifyChanged(subject);
+        }
+
+        await pusher.flush();
+      } catch (error) {
+        lastError = { direction: 'push', subject: graph, error };
+      }
+
       report();
     },
 

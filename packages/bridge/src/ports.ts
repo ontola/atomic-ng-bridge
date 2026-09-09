@@ -31,6 +31,15 @@ export type AtomicSource = {
   onChanged: (callback: (subject: string) => void) => () => void;
   /** Resolves to `undefined` when the resource no longer exists. */
   getSnapshot: (subject: string) => Promise<AtomicSnapshot | undefined>;
+  /**
+   * Every subject that belongs in the mirror right now. Read once when the
+   * bridge starts, so that what changed while it was not running (edits made
+   * offline before a reload, a drive that existed before the mirror was
+   * attached) is pushed without waiting for the next change event. The
+   * pusher hashes each one and skips what the document already holds, so
+   * listing is cheap to get wrong in the direction of too many. Optional.
+   */
+  listSubjects?: () => Promise<string[]>;
 };
 
 export type NgSubscription = { close: () => void };
