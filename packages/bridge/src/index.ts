@@ -4,6 +4,7 @@ export * from './mapping.js';
 export * from './sparql.js';
 export * from './canonical.js';
 export * from './alias.js';
+export * from './merge.js';
 export * from './ports.js';
 export * from './push.js';
 export * from './pull.js';

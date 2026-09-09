@@ -107,6 +107,24 @@ export function createAtomicStoreSink(
       await resource.save();
     },
 
+    currentPropVals: async subject => {
+      try {
+        const resource = await store.getResource(subject);
+
+        if (!resource.isReady()) {
+          return undefined;
+        }
+
+        return Object.fromEntries(
+          Object.entries(resource.getPropVals()).filter(
+            ([property]) => !isVolatileProperty(property),
+          ),
+        );
+      } catch {
+        return undefined;
+      }
+    },
+
     removeResource: async subject => {
       try {
         const resource = await store.getResource(subject);

@@ -68,10 +68,25 @@ export type CursorEntry = {
    * added to the same subject untouched.
    */
   predicates: string[];
+  /**
+   * The triples the document was last known to hold for this subject, in the
+   * document's own terms (aliased subjects, see alias.ts). This is the base of
+   * the per-predicate three-way merge (merge.ts): with it, push writes only
+   * what changed locally and pull applies only what changed remotely. Absent
+   * on cursors written before this existed; both sides then fall back to
+   * whole-subject replace and apply, as before.
+   */
+  triples?: Triple[];
 };
 
 export type CursorStore = {
   get: (subject: string) => Promise<CursorEntry | undefined>;
   set: (subject: string, entry: CursorEntry) => Promise<void>;
   delete: (subject: string) => Promise<void>;
+  /**
+   * Every subject with a cursor. Lets a full pull notice subjects that have
+   * disappeared from the document, which a listing of the document cannot
+   * show. Optional; without it, native deletions are only seen by `pull()`.
+   */
+  keys?: () => Promise<string[]>;
 };

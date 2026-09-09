@@ -21,6 +21,7 @@
 import { aliasResourceTriples, ngSubjectFor } from './alias.js';
 import { contentHash } from './canonical.js';
 import { resourceToTriples } from './mapping.js';
+import { changedPredicates } from './merge.js';
 import type {
   AtomicSource,
   CursorEntry,
@@ -33,6 +34,7 @@ import {
   insertTriplesUpdate,
   replaceSubjectSteps,
   replaceSubjectUpdate,
+  selectSubjectQuery,
 } from './sparql.js';
 import type { MappingWarning } from './types.js';
 
@@ -72,6 +74,13 @@ export type PusherOptions = {
    * authoritative over the whole subject, including data the bridge never wrote.
    */
   preserveForeignPredicates?: boolean;
+  /**
+   * Read the subject from the document before a partial push. This is what
+   * lets a push notice that a native app deleted the row meanwhile, and stand
+   * down instead of resurrecting a fragment of it. One query per pushed
+   * subject; off only for transports that cannot serve subject reads (tests).
+   */
+  checkRemoteBeforePush?: boolean;
   onWarning?: (warning: MappingWarning) => void;
   onError?: (error: PushError) => void;
   /** Auto-flush after a quiet period. Off in tests, which flush explicitly. */
@@ -106,6 +115,7 @@ export function createPusher(options: PusherOptions): Pusher {
     supportsMultiOperationUpdate = true,
     emitRdfType = true,
     preserveForeignPredicates = true,
+    checkRemoteBeforePush = true,
     onWarning,
     onError,
     autoFlush = true,
@@ -173,25 +183,57 @@ export function createPusher(options: PusherOptions): Pusher {
     }
 
     const predicates = [...new Set(triples.map(triple => triple.predicate))];
-    // Everything we are about to write, plus everything we wrote last time and
-    // are not writing now (a property the user just cleared).
-    const deleteOnlyPredicates = preserveForeignPredicates
-      ? [...new Set([...(previous?.predicates ?? []), ...predicates])]
-      : undefined;
+    const base = preserveForeignPredicates ? previous?.triples : undefined;
+
+    let toWrite = triples;
+    let deleteOnlyPredicates: string[] | undefined;
+
+    if (base !== undefined) {
+      // We know what the document held last time, so write only what changed
+      // since: a predicate a native app changed meanwhile keeps its value.
+      if (checkRemoteBeforePush) {
+        const remote = await transport.query(selectSubjectQuery(graph, ngSubject));
+
+        if (remote.length === 0) {
+          // Deleted on the other side while the user was editing. Writing now
+          // would bring back a fragment of the row; let the pull side remove
+          // the local copy instead, and say so.
+          onWarning?.({
+            subject,
+            property: '',
+            kind: 'concurrent-edit',
+            message: 'Deleted in NextGraph while edited locally; the local edit is not pushed.',
+          });
+          result.skipped.push(subject);
+
+          return;
+        }
+      }
+
+      const changed = changedPredicates(triples, base);
+      deleteOnlyPredicates = changed;
+      toWrite = triples.filter(triple => changed.includes(triple.predicate));
+    } else if (preserveForeignPredicates) {
+      // No base: everything we are about to write, plus everything we wrote
+      // last time and are not writing now (a property the user just cleared).
+      deleteOnlyPredicates = [
+        ...new Set([...(previous?.predicates ?? []), ...predicates]),
+      ];
+    }
 
     if (supportsMultiOperationUpdate) {
       await transport.update(
-        replaceSubjectUpdate(graph, ngSubject, triples, { deleteOnlyPredicates }),
+        replaceSubjectUpdate(graph, ngSubject, toWrite, { deleteOnlyPredicates }),
       );
     } else {
       await runUpdates(
-        replaceSubjectSteps(graph, ngSubject, triples, { deleteOnlyPredicates }),
+        replaceSubjectSteps(graph, ngSubject, toWrite, { deleteOnlyPredicates }),
       );
     }
 
     // Only now: a cursor written before the update would turn a failed push
     // into a permanently skipped subject.
-    await cursors.set(subject, { hash, predicates });
+    await cursors.set(subject, { hash, predicates, triples });
     result.pushed.push(subject);
   };
 
@@ -276,6 +318,7 @@ export function createMemoryCursorStore(
     delete: async subject => {
       map.delete(subject);
     },
+    keys: async () => [...map.keys()],
     snapshot: () => Object.fromEntries(map),
   };
 }

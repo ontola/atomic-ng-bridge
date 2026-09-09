@@ -13,12 +13,14 @@
 
 import {
   type AliasMap,
+  aliasResourceTriples,
   isDriveResource,
   ngSubjectFor,
   unaliasResourceTriples,
 } from './alias.js';
 import { contentHash } from './canonical.js';
-import { triplesToPropVals } from './mapping.js';
+import { resourceToTriples, triplesToPropVals } from './mapping.js';
+import { mergeTriples } from './merge.js';
 import type { CursorStore, NgTransport } from './ports.js';
 import {
   selectAliasesQuery,
@@ -45,6 +47,16 @@ export type AtomicSink = {
   ) => Promise<void>;
   /** Removes a resource that is gone from the graph. */
   removeResource: (subject: string) => Promise<void>;
+  /**
+   * The resource's current local property values, or undefined if it does
+   * not exist locally. With this, a pull merges per predicate against the
+   * last synced state instead of replacing the whole resource, so a field the
+   * user edited a moment ago survives a change to another field made in
+   * NextGraph. Optional; without it, pull applies the whole resource.
+   */
+  currentPropVals?: (
+    subject: string,
+  ) => Promise<Record<string, unknown> | undefined>;
   /** Declared datatypes, so string subtypes and `atomicURL` survive the trip. */
   datatypeOf: DatatypeResolver;
   /**
@@ -169,9 +181,14 @@ export function createPuller(options: PullerOptions): Puller {
     // Hash the document's own terms, before mapping links back: this is what
     // the push side hashes too, so a pulled write is not pushed again.
     const hash = contentHash(raw);
-    const { subject, triples } = unaliasResourceTriples(ngSubject, raw, aliases);
+    const { subject, triples: remote } = unaliasResourceTriples(
+      ngSubject,
+      raw,
+      aliases,
+    );
+    const cursor = await cursors.get(subject);
 
-    if ((await cursors.get(subject))?.hash === hash) {
+    if (cursor?.hash === hash) {
       // Already applied, or we pushed exactly this. Either way, nothing to do,
       // and this is the check that stops a pull from re-triggering a push.
       result.unchanged.push(subject);
@@ -179,10 +196,37 @@ export function createPuller(options: PullerOptions): Puller {
       return;
     }
 
-    const predicates = [...new Set(triples.map(triple => triple.predicate))];
+    const predicates = [...new Set(raw.map(triple => triple.predicate))];
     await sink.warmDatatypes?.(
       predicates.filter(predicate => predicate !== bridge.atomicSubject),
     );
+
+    // With a base and the local state, take from the document only what
+    // changed there, and keep everything the user changed locally meanwhile.
+    let triples = remote;
+    const current = await sink.currentPropVals?.(subject);
+
+    if (cursor?.triples !== undefined && current !== undefined) {
+      const local = aliasResourceTriples(
+        subject,
+        resourceToTriples(subject, current, { datatypeOf: sink.datatypeOf })
+          .triples,
+        graph,
+      ).triples;
+      const merged = mergeTriples(cursor.triples, local, raw);
+
+      for (const property of merged.conflicts) {
+        onWarning?.({
+          subject,
+          property,
+          kind: 'concurrent-edit',
+          message:
+            'Changed on both sides in one window; the NextGraph value was kept, the local one is in history.',
+        });
+      }
+
+      triples = unaliasResourceTriples(ngSubject, merged.triples, aliases).triples;
+    }
 
     const { propVals, warnings } = triplesToPropVals(triples, {
       datatypeOf: sink.datatypeOf,
@@ -196,8 +240,9 @@ export function createPuller(options: PullerOptions): Puller {
 
     // After the local write lands, not before: a cursor recorded early would
     // make a failed apply look like a completed one, and the change would never
-    // be pulled again.
-    await cursors.set(subject, { hash, predicates });
+    // be pulled again. The base is what the document holds, so the next push
+    // sees exactly the local edits that are still unpushed.
+    await cursors.set(subject, { hash, predicates, triples: raw });
     result.applied.push(subject);
   };
 
@@ -245,8 +290,15 @@ export function createPuller(options: PullerOptions): Puller {
     running = true;
 
     try {
-      const subjects = await listSubjects(transport, graph);
-      const result = await queue(subjects);
+      const listed = await listSubjects(transport, graph);
+      // A subject a native app deleted is not in the listing. The cursors
+      // remember it; visiting it finds nothing and removes the local copy.
+      const known = (await cursors.keys?.()) ?? [];
+      const present = new Set(listed);
+      const gone = known.filter(
+        subject => !present.has(ngSubjectFor(subject, graph)),
+      );
+      const result = await queue([...listed, ...gone]);
 
       return result;
     } finally {

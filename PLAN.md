@@ -710,10 +710,14 @@ Ordered by how much damage they do if they turn out badly.
    methods we depend on exist.
 3. **Wallet material in our app.** Direct consequence of choosing the embedded engine. Needs a
    written security note and a review before shipping, not just a mention.
-4. **Mirror merge semantics.** Two systems, reconciled after the fact. Fine for turn-taking use,
-   last-write-wins per resource for genuinely concurrent cross-system edits (pull applies the
-   NextGraph version of a subject whole, see `atomic-store-sink.ts`). Document it; do not imply
-   a shared CRDT.
+4. **Mirror merge semantics.** Two systems, reconciled after the fact, per predicate. Each
+   cursor keeps the triples the document last held for the subject; push writes only the
+   predicates that changed locally against that base, pull applies only the predicates that
+   changed remotely and keeps the rest of the local state (`merge.ts`). Concurrent edits to
+   different fields of one row therefore both survive; the same field changed on both sides in
+   one window is won by whichever direction runs first, and reported as a `concurrent-edit`
+   warning. `test/scenarios.test.ts` runs the real pusher and puller through these cases. Do not
+   imply a shared CRDT.
 5. **`;`-separated SPARQL updates.** Unverified. Falls back to two commits if unsupported.
 6. **Loro rich-text documents.** They round-trip as opaque base64 on the NextGraph side. A native
    NextGraph consumer cannot read their content. Worth being explicit about rather than letting it
@@ -787,8 +791,12 @@ Every place the mirror cannot be invisible to a user. Kept here rather than disc
    appends a member without updating the bookkeeping triple gets that member appended in sorted
    position on the Atomic side, not at the end of the user's list. Deterministic, but it is not the
    position that writer intended, and there is no way to recover the intent.
-4. **Two systems, reconciled after the fact.** Simultaneous edits to the same field from both sides
-   inside one sync window are last-write-wins per field. Turn-taking use never sees this.
+4. **Two systems, reconciled after the fact.** Edits to different fields of one row from both
+   sides merge per predicate against the last synced state. The same field edited on both sides
+   inside one sync window is won by whichever direction runs first; the other value stays in the
+   Atomic-side history and a `concurrent-edit` warning is raised. A row deleted natively while
+   edited locally is removed, not resurrected: push reads the subject before a partial write and
+   stands down when it is gone. Turn-taking use never sees any of this.
 5. **Attribution.** Pull-side writes are ordinary local commits signed by whichever identity the app
    holds. In the embedded-engine model that is the user's own, which is the good outcome, but any
    design where a service identity does the writing shows collaborators "the Bridge" as the author of

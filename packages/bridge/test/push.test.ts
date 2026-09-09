@@ -104,6 +104,7 @@ const setup = (initial?: Record<string, Record<string, unknown>>) => {
     // opt into the two-step path explicitly.
     supportsMultiOperationUpdate: false,
     autoFlush: false,
+    checkRemoteBeforePush: false, // fakeTransport has no document to read
   });
 
   return { ...source, ...transport, cursors, pusher };
@@ -136,6 +137,8 @@ describe('pushing a changed resource', () => {
       transport: transport.transport,
       cursors: createMemoryCursorStore(),
       autoFlush: false,
+      checkRemoteBeforePush: false, // fakeTransport has no document to read
+
     });
 
     pusher.start();
@@ -197,6 +200,8 @@ describe('pushing a changed resource', () => {
       transport: transport.transport,
       cursors: createMemoryCursorStore(),
       autoFlush: false,
+      checkRemoteBeforePush: false, // fakeTransport has no document to read
+
       onWarning,
     });
 
@@ -239,6 +244,8 @@ describe('idempotence and resume', () => {
       transport: transport.transport,
       cursors: createMemoryCursorStore(),
       autoFlush: false,
+      checkRemoteBeforePush: false, // fakeTransport has no document to read
+
     });
 
     pusher.notifyChanged('did:ad:resource:1');
@@ -362,6 +369,8 @@ describe('lifecycle', () => {
       // two halves that could be interleaved.
       supportsMultiOperationUpdate: false,
       autoFlush: false,
+      checkRemoteBeforePush: false, // fakeTransport has no document to read
+
     });
 
     pusher.start();
@@ -437,10 +446,11 @@ describe('not destroying data the bridge did not write', () => {
     t.edit('did:ad:resource:1', { [P('name')]: 'a' });
     await t.pusher.flush();
 
-    // `count` is gone from the resource, so it has to be named in the delete
-    // even though it is not in the insert.
+    // `count` is gone from the resource, so it has to be named in the delete.
+    // Nothing else changed, so there is nothing to insert: one update only.
+    expect(t.updates).toHaveLength(1);
+    expect(t.updates[0]).toContain('DELETE');
     expect(t.updates[0]).toContain(P('count'));
-    expect(t.updates[1]).not.toContain(P('count'));
   });
 
   it('writes nothing on a delete it has no record of writing', async () => {
@@ -466,6 +476,8 @@ describe('not destroying data the bridge did not write', () => {
       cursors: createMemoryCursorStore(),
       preserveForeignPredicates: false,
       autoFlush: false,
+      checkRemoteBeforePush: false, // fakeTransport has no document to read
+
     });
 
     pusher.notifyChanged('did:ad:resource:1');

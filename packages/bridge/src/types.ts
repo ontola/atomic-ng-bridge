@@ -42,7 +42,12 @@ export type MappingWarning = {
   subject: string;
   property: string;
   /** Machine-readable so callers can count kinds without parsing prose. */
-  kind: 'unsupported-value' | 'unknown-datatype' | 'lossy-nested-resource';
+  kind:
+    | 'unsupported-value'
+    | 'unknown-datatype'
+    | 'lossy-nested-resource'
+    /** The same predicate changed on both sides in one window; one value lost. */
+    | 'concurrent-edit';
   message: string;
 };
 

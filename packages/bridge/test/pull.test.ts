@@ -340,6 +340,7 @@ describe('push and pull together', () => {
       transport: pushTransport,
       cursors,
       autoFlush: false,
+      checkRemoteBeforePush: false,
     });
     const puller = createPuller({
       graph: GRAPH,
@@ -395,6 +396,7 @@ describe('push and pull together', () => {
       },
       cursors,
       autoFlush: false,
+      checkRemoteBeforePush: false,
     });
 
     // Pretend a pull had applied an older version a moment ago.
