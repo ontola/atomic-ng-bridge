@@ -68,7 +68,7 @@ export type EngineRequest =
   | {
       id: number;
       method: 'findOrCreateDocument';
-      params: { appClass: string; knownNuri?: string };
+      params: { appClass: string; knownNuri?: string; workspace?: string };
     }
   | {
       id: number;

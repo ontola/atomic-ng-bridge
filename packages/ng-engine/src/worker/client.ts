@@ -98,10 +98,10 @@ export function createWorkerEngine(options: WorkerEngineOptions): WorkerEngine {
 
     open: params => call<OpenResult>({ method: 'open', params }),
 
-    findOrCreateDocument: (appClass, knownNuri) =>
+    findOrCreateDocument: (appClass, knownNuri, workspace) =>
       call<{ nuri: string; created: boolean }>({
         method: 'findOrCreateDocument',
-        params: { appClass, knownNuri },
+        params: { appClass, knownNuri, workspace },
       }),
 
     listDocuments: appClass =>

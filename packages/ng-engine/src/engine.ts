@@ -32,6 +32,7 @@ export type NgEngineApi = {
   findOrCreateDocument: (
     appClass: string,
     knownNuri?: string,
+    workspace?: string,
   ) => Promise<{ nuri: string; created: boolean }>;
   /** Every document of the user's carrying this app's class triple. */
   listDocuments: (appClass: string) => Promise<string[]>;

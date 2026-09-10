@@ -44,8 +44,8 @@ export function createPageEngine(): NgEngineApi {
       return opened.result;
     },
 
-    findOrCreateDocument: (appClass, knownNuri) =>
-      findOrCreateDocument(ng!, requireSession(), appClass, { knownNuri }),
+    findOrCreateDocument: (appClass, knownNuri, workspace) =>
+      findOrCreateDocument(ng!, requireSession(), appClass, { knownNuri, workspace }),
 
     listDocuments: appClass => listDocuments(ng!, requireSession(), appClass),
 

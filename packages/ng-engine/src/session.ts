@@ -379,10 +379,21 @@ export type FindDocumentOptions = {
   knownNuri?: string;
   crdt?: string;
   className?: string;
+  /**
+   * The workspace this document mirrors, as its IRI. A wallet's store holds
+   * many documents, and each workspace gets its own: the document is marked
+   * `<doc> <workspace-predicate> <workspace>` and found by that. Without it,
+   * the first document carrying the app class is taken, which is only right
+   * when a wallet has exactly one workspace.
+   */
+  workspace?: string;
   /** How long to wait for `knownNuri` to arrive from the broker. */
   waitAttempts?: number;
   waitDelayMs?: number;
 };
+
+/** Written into a document beside the app class: which workspace it mirrors. */
+export const WORKSPACE_PREDICATE = 'https://atomicdata.dev/ng-bridge/workspace';
 
 export async function findOrCreateDocument(
   ng: NgWasm,
@@ -394,6 +405,7 @@ export async function findOrCreateDocument(
     knownNuri,
     crdt = 'Graph',
     className = 'data:graph',
+    workspace,
     waitAttempts,
     waitDelayMs,
   } = options;
@@ -405,17 +417,50 @@ export async function findOrCreateDocument(
     return { nuri: knownNuri, created: false };
   }
 
-  const found = await ng.sparql_query(
-    session.sessionId,
-    `SELECT ?doc WHERE { GRAPH ?doc { ?s a <${appClassIri}> } }`,
-    undefined,
-    undefined,
-  );
+  const select = async (sparql: string) =>
+    bindingsToValues(
+      await ng.sparql_query(session.sessionId, sparql, undefined, undefined),
+      'doc',
+    );
 
-  const existing = bindingsToValues(found, 'doc')[0];
+  const claim = (nuri: string) =>
+    workspace === undefined
+      ? Promise.resolve()
+      : ng.sparql_update(
+          session.sessionId,
+          `INSERT DATA { GRAPH <${nuri}> { <${nuri}> <${WORKSPACE_PREDICATE}> <${workspace}> } }`,
+          nuri,
+        );
 
-  if (existing !== undefined) {
-    return { nuri: existing, created: false };
+  if (workspace !== undefined) {
+    const mine = await select(
+      `SELECT ?doc WHERE { GRAPH ?doc { ?doc a <${appClassIri}> ; <${WORKSPACE_PREDICATE}> <${workspace}> } }`,
+    );
+
+    if (mine[0] !== undefined) {
+      return { nuri: mine[0], created: false };
+    }
+
+    // A document from before workspaces were marked: it carries the class
+    // and no workspace. If there is exactly one, it is this workspace's, from
+    // the time a wallet had only one; claim it rather than start a rival.
+    const unmarked = await select(
+      `SELECT ?doc WHERE { GRAPH ?doc { ?doc a <${appClassIri}> . FILTER NOT EXISTS { ?doc <${WORKSPACE_PREDICATE}> ?w } } }`,
+    );
+
+    if (unmarked.length === 1) {
+      await claim(unmarked[0]!);
+
+      return { nuri: unmarked[0]!, created: false };
+    }
+  } else {
+    const existing = await select(
+      `SELECT ?doc WHERE { GRAPH ?doc { ?s a <${appClassIri}> } }`,
+    );
+
+    if (existing[0] !== undefined) {
+      return { nuri: existing[0], created: false };
+    }
   }
 
   const nuri = await ng.doc_create(
@@ -431,6 +476,7 @@ export async function findOrCreateDocument(
     `INSERT DATA { GRAPH <${nuri}> { <${nuri}> a <${appClassIri}> } }`,
     nuri,
   );
+  await claim(nuri);
 
   return { nuri, created: true };
 }

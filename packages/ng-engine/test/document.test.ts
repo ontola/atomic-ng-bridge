@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { findOrCreateDocument, waitForDocument } from '../src/index.js';
+import { WORKSPACE_PREDICATE, findOrCreateDocument, waitForDocument } from '../src/index.js';
 
 const SESSION = { sessionId: 's', userId: 'u' } as never;
 const CLASS = 'did:ng:z:AtomicDriveMirror';
@@ -86,5 +86,73 @@ describe('opening the document a workspace already mirrors into', () => {
     await expect(waitForDocument(ng, SESSION, KNOWN, 1, 0)).rejects.toThrow(
       'SyntaxError',
     );
+  });
+});
+
+describe('one document per workspace', () => {
+  /** A fake store: documents with their class and, optionally, their workspace. */
+  const store = (docs: Record<string, string | undefined>) => {
+    const updates: string[] = [];
+    const ng = {
+      sparql_query: vi.fn((_s: unknown, sparql: string) => {
+        const byWorkspace = /<([^>]+)> \} \}$/.exec(sparql);
+        let hits: string[];
+
+        if (sparql.includes('FILTER NOT EXISTS')) {
+          hits = Object.entries(docs).filter(([, ws]) => ws === undefined).map(([d]) => d);
+        } else if (sparql.includes(WORKSPACE_PREDICATE) && byWorkspace !== null) {
+          hits = Object.entries(docs).filter(([, ws]) => ws === byWorkspace[1]).map(([d]) => d);
+        } else {
+          hits = Object.keys(docs);
+        }
+
+        return Promise.resolve({
+          results: { bindings: hits.map(d => ({ doc: { type: 'uri', value: d } })) },
+        });
+      }),
+      doc_create: vi.fn(() => Promise.resolve('did:ng:o:new')),
+      sparql_update: vi.fn((_s: unknown, sparql: string) => {
+        updates.push(sparql);
+
+        return Promise.resolve(undefined);
+      }),
+    };
+
+    return { ng: ng as never, updates };
+  };
+
+  it('finds the document marked with this workspace, not another workspace\'s', async () => {
+    const t = store({ 'did:ng:o:a': 'did:ad:drive-a', 'did:ng:o:b': 'did:ad:drive-b' });
+
+    expect(await findOrCreateDocument(t.ng, SESSION, CLASS, { workspace: 'did:ad:drive-b' })).toEqual({
+      nuri: 'did:ng:o:b',
+      created: false,
+    });
+  });
+
+  it('creates a second document for a second workspace in the same wallet', async () => {
+    const t = store({ 'did:ng:o:a': 'did:ad:drive-a' });
+
+    const doc = await findOrCreateDocument(t.ng, SESSION, CLASS, { workspace: 'did:ad:drive-b' });
+
+    expect(doc).toEqual({ nuri: 'did:ng:o:new', created: true });
+    expect(t.updates.some(u => u.includes(WORKSPACE_PREDICATE) && u.includes('did:ad:drive-b'))).toBe(true);
+  });
+
+  it('claims a single document from before workspaces were marked', async () => {
+    const t = store({ 'did:ng:o:old': undefined });
+
+    const doc = await findOrCreateDocument(t.ng, SESSION, CLASS, { workspace: 'did:ad:drive-a' });
+
+    expect(doc).toEqual({ nuri: 'did:ng:o:old', created: false });
+    expect(t.updates.some(u => u.includes('did:ng:o:old') && u.includes('did:ad:drive-a'))).toBe(true);
+  });
+
+  it('does not guess between several unmarked documents', async () => {
+    const t = store({ 'did:ng:o:old1': undefined, 'did:ng:o:old2': undefined });
+
+    const doc = await findOrCreateDocument(t.ng, SESSION, CLASS, { workspace: 'did:ad:drive-a' });
+
+    expect(doc.created).toBe(true);
   });
 });

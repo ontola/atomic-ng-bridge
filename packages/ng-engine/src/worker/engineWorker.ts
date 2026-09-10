@@ -76,6 +76,7 @@ async function handle(request: EngineRequest): Promise<unknown> {
 
       return findOrCreateDocument(wasm, requireSession(), request.params.appClass, {
         knownNuri: request.params.knownNuri,
+        workspace: request.params.workspace,
       });
     }
 

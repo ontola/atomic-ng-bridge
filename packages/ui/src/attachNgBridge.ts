@@ -132,7 +132,8 @@ async function findDocumentWithRetry(
 
   for (let attempt = 0; attempt < attempts; attempt++) {
     try {
-      return await engine.findOrCreateDocument(APP_CLASS, known);
+      // One document per workspace: found by the workspace it is marked with.
+      return await engine.findOrCreateDocument(APP_CLASS, known, drive);
     } catch (error) {
       last = error;
 
