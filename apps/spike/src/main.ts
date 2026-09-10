@@ -52,6 +52,10 @@ installNgStorageBridge();
 // Exposed for diagnostics: this page is a harness, and being able to poke the
 // engine from the console (or an automation driver) is the point of it.
 (window as unknown as { ng: NgWasm }).ng = wasm;
+// The session and document, for a script driving this page from outside.
+Object.defineProperty(window, '__spike', {
+  get: () => ({ session, graph, connected }),
+});
 
 let session: NgSession | undefined;
 let graph: string | undefined = localStorage.getItem(DOC_KEY) ?? undefined;
@@ -172,7 +176,9 @@ on('create', async () => {
  * this is never a stale copy of someone else's infrastructure; the shape is
  * `{ V0: { bootstrap, registration_url } }`.
  */
-const PUBLIC_BOOTSTRAP_URL = 'https://nextgraph.eu/.ng_bootstrap';
+const PUBLIC_BOOTSTRAP_URL =
+  new URLSearchParams(location.search).get('bootstrap') ??
+  'https://nextgraph.eu/.ng_bootstrap';
 
 on('public', async () => {
   clear();

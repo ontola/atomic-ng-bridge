@@ -177,6 +177,46 @@ a distinct signal here would be worth a lot.
 that wants to work offline before it has ever reached a broker? And could a rejected registration
 be reported distinctly from a dropped connection?
 
+## 7c. Reading a document without a wallet: not reachable through the web SDK
+
+**Question we needed answered:** can a document be read by someone who holds no wallet, given its
+nuri, as a published form would need? We were told this exists ("any document can be fetched from
+its DID:NG URI, no need for an account; the URIs contain the ID of the document and the encryption
+key"). We could not reach it through `@ng-org/lib-wasm` 0.1.2-alpha.6, and here is exactly what we
+tried, against a local `ngd`, with `e2e/scripts/public-read-probe.mjs`.
+
+Two browser contexts. A creates a wallet, connects, creates a document (`did:ng:o:<repo>:v:<overlay>`)
+and writes one triple; A reads it back (2 bindings) and `fetch_header` returns `{"class":"data:graph"}`.
+Then B:
+
+| B has | Call | Result |
+| --- | --- | --- |
+| no wallet | `sparql_query(undefined, …, nuri)` | `Invalid session_id` |
+| no wallet | `fetch_header(undefined, nuri)` | `Invalid session_id` |
+| no wallet | `app_request(doc_fetch_repo_subscribe(nuri))` | `LocalBrokerNotInitialized` |
+| no wallet | `app_request_stream(doc_fetch_repo_subscribe(nuri))` | `LocalBrokerNotInitialized` |
+| its own wallet, same broker | `sparql_query(sessionB, …, nuri)` | `RepoNotFound` |
+| its own wallet, same broker | `fetch_header(sessionB, nuri)` | `RepoNotFound` |
+| its own wallet, same broker | `app_request_stream(fetch_repo_subscribe, session_id = B)` | `RepoNotFound` |
+
+What the source says, which matches: `app_request` resolves the request's session through
+`get_real_session_id_for_mut` and fails without one (`sdk/rust/src/local_broker.rs`, `app_request`);
+`AppRequest::doc_fetch_repo_subscribe` builds the request with `session_id: None`, and your own
+app fills it in before sending (`app/ui-common/src/store.ts:552-554`). Every read export in
+`lib_wasm.d.ts` takes a `session_id` except `app_request*`, which needs one inside the request.
+
+The nuri grammar does have a link form carrying read capabilities and a locator
+(`engine/net/src/types.rs`, the `:c:<commit>:k:<key>…:l:<locator>` regex), which is presumably the
+"URI with the key". **No export of the web SDK produces such a link from a session, and none
+consumes one without a session.** So from a third party's position: a second wallet given the plain
+document nuri gets `RepoNotFound`, and a page with no wallet cannot make any read call at all.
+
+**What we would ask:** the pair of calls a third party needs, `doc_get_read_link(session_id, nuri)`
+returning the capability link, and a way to open such a link for reading with an in-memory session
+that needs no registered wallet (or documentation of the intended flow if it exists in the native
+apps). Until then, a published form for someone with no account has to be served by something
+other than the web SDK.
+
 ## 8. Smaller notes
 
 - The published wasm is a wasm-pack *bundler* target: its entry imports the `.wasm` directly and
