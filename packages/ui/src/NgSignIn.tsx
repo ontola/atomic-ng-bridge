@@ -2,10 +2,11 @@
  * "Continue with NextGraph" — the whole sign-in, as one panel.
  *
  * Shown when the mirror is enabled and nobody is signed in. With the hosted
- * wallet (the default engine) it is one button: the app hands over to
- * NextGraph's wallet page at nextgraph.net, which signs the user in and loads
- * this app inside it with a session. Inside that frame the panel does not
- * wait for a click; the session is already there.
+ * wallet (the default engine) there is nothing to click: the app hands over
+ * to NextGraph's wallet page at once, which signs the user in and loads this
+ * app inside it with a session; inside that frame the panel only says what
+ * is happening while the session is taken up. The panel is opaque in both
+ * cases so the app underneath is not seen for the moment it takes.
  *
  * With an embedded engine, everything the user needs is here instead: use the
  * wallet this browser already has, bring a `.ngw`, or get a NextGraph identity
@@ -65,15 +66,33 @@ export function NgSignIn({
     [store, onSignedIn, workspaceName],
   );
 
-  // Inside the wallet's frame the user has already signed in on the wallet
-  // page; asking them to click again would be asking twice.
+  // The hosted wallet needs no click. On a top-level page this navigates to
+  // the wallet; inside the wallet's frame the user has already signed in
+  // there, and asking again would be asking twice.
   useEffect(() => {
-    if (hosted && insideHostedWallet()) {
+    if (hosted) {
       void run({ kind: 'web' });
     }
     // Once, on mount: `run` is stable for the life of the panel.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hosted]);
+
+  if (hosted) {
+    return (
+      <Backdrop>
+        <Panel>
+          <h2>{ngStatus('NextGraph')}</h2>
+          <Status>
+            {busy ??
+              (insideHostedWallet()
+                ? ngStatus('Signing in with your NextGraph wallet…')
+                : ngStatus('Taking you to your NextGraph wallet…'))}
+          </Status>
+          {error !== undefined ? <ErrorText>{error}</ErrorText> : null}
+        </Panel>
+      </Backdrop>
+    );
+  }
 
   const onFile = useCallback(
     async (file: File) => {
@@ -99,12 +118,6 @@ export function NgSignIn({
 
         {busy !== undefined ? (
           <Status>{busy}</Status>
-        ) : hosted ? (
-          <Actions>
-            <Primary type='button' onClick={() => void run({ kind: 'web' })}>
-              {ngStatus('Continue with NextGraph')}
-            </Primary>
-          </Actions>
         ) : (
           <Actions>
             <Primary
@@ -142,13 +155,9 @@ export function NgSignIn({
         {error !== undefined ? <ErrorText>{error}</ErrorText> : null}
 
         <Fine>
-          {hosted
-            ? ngStatus(
-                'You sign in on nextgraph.net, in your own wallet. This app then runs inside it, and your workspace is mirrored into NextGraph while it is open.',
-              )
-            : ngStatus(
-                'Your workspace lives on this device and is mirrored into NextGraph while the app is open.',
-              )}
+          {ngStatus(
+            'Your workspace lives on this device and is mirrored into NextGraph while the app is open.',
+          )}
         </Fine>
       </Panel>
     </Backdrop>

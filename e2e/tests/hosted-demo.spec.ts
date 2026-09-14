@@ -271,29 +271,23 @@ test('sign in on NextGraph\'s wallet page, then mirror a table both ways', async
   await register.waitForTimeout(3000);
   await register.close().catch(() => undefined);
 
-  // 1 · The app, with nothing hosted behind it -----------------------------
+  // 1 · The app hands over to the wallet at once ---------------------------
   await page.goto('/?ngbridge=1&ngengine=web');
-  const go = page.getByRole('button', { name: 'Continue with NextGraph' });
-  await expect(go).toBeVisible({ timeout: 60_000 });
-
-  await installCaptionOnly(page);
-  await caption(
-    page,
-    'Atomic Tables, Forms and Kanban - running with no AtomicServer.',
-    2500,
-  );
-  await caption(
-    page,
-    "Sign-in is NextGraph's own wallet page. The app hands over and never sees the wallet.",
-    2500,
-  );
-
-  // 2 · Hand-over to the wallet, which opens and hands back a session ------
-  await go.click();
-  await page.waitForURL(url => url.origin === WALLET_ORIGIN, { timeout: 30_000 });
+  await page.waitForURL(url => url.origin === WALLET_ORIGIN, { timeout: 60_000 });
   await expect(page.getByText(/Opening Wallet for/)).toBeVisible({ timeout: 60_000 });
   await installCaptionOnly(page);
-  await caption(page, "NextGraph's wallet page, asking which wallet opens this app.", 2000);
+  await caption(
+    page,
+    'Atomic Tables, Forms and Kanban, with no AtomicServer. Opening the app sends you to NextGraph.',
+    3000,
+  );
+  await caption(
+    page,
+    "This is NextGraph's own wallet page. The app never sees the wallet.",
+    2500,
+  );
+
+  // 2 · The wallet opens and hands back a session --------------------------
 
   await page.getByRole('button', { name: /Login/ }).first().click();
   await page.locator('input[type=file]').first().setInputFiles(walletFile!);

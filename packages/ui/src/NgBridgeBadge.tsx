@@ -4,6 +4,7 @@ import { styled } from 'styled-components';
 import { NgSignIn } from './NgSignIn.js';
 import { ngStatus } from './status';
 import { useNgBridge } from './useNgBridge';
+import { engineMode } from './ngSession.js';
 
 /**
  * A small badge showing what the NextGraph mirror is doing.
@@ -101,7 +102,12 @@ export function NgBridgeBadge({
   }
 
   if (signIn && !signedIn) {
-    return resolved ? <NgSignIn store={store} onSignedIn={onSignedIn} /> : null;
+    // The hosted wallet does not wait for the agent to hydrate: its session
+    // comes from the wallet page, so the hand-over happens right away and the
+    // panel covers the app from the first frame.
+    return resolved || engineMode() === 'web' ? (
+      <NgSignIn store={store} onSignedIn={onSignedIn} />
+    ) : null;
   }
 
   const state = error !== undefined ? 'error' : pending > 0 ? 'busy' : 'live';
