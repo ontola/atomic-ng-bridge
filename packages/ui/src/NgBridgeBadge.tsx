@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { StoreEvents, type Store } from '@tomic/lib';
 import { styled } from 'styled-components';
 import { NgSignIn } from './NgSignIn.js';
@@ -61,8 +61,13 @@ export function NgBridgeBadge({
 
     return () => clearTimeout(timer);
   }, [resolved]);
+  // With the hosted wallet the panel covers the app until the workspace is
+  // open, not merely until an agent exists: between those two moments the
+  // app would otherwise show its welcome screen for a second.
+  const handedOff = useRef(false);
   const onSignedIn = useCallback(
     (info: { agentSubject: string; drive: string }) => {
+      handedOff.current = true;
       setSignedIn(true);
 
       if (onSignedInProp !== undefined) {
@@ -91,6 +96,10 @@ export function NgBridgeBadge({
   useEffect(
     () =>
       store.on(StoreEvents.AgentChanged, agent => {
+        if (agent !== undefined && engineMode() === 'web' && !handedOff.current) {
+          return;
+        }
+
         setSignedIn(agent !== undefined);
         setResolved(true);
       }),

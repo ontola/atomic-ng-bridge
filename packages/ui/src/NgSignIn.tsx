@@ -78,18 +78,18 @@ export function NgSignIn({
   }, [hosted]);
 
   if (hosted) {
+    // Top level: the page is about to leave for the wallet, so there is
+    // nothing worth reading; a blank cover is what a redirect looks like.
+    // Inside the wallet's frame: one quiet line while the session is taken up
+    // and the workspace opened, then the app. No running commentary.
     return (
       <Backdrop>
-        <Panel>
-          <h2>{ngStatus('NextGraph')}</h2>
-          <Status>
-            {busy ??
-              (insideHostedWallet()
-                ? ngStatus('Signing in with your NextGraph wallet…')
-                : ngStatus('Taking you to your NextGraph wallet…'))}
-          </Status>
-          {error !== undefined ? <ErrorText>{error}</ErrorText> : null}
-        </Panel>
+        {insideHostedWallet() || error !== undefined ? (
+          <Panel>
+            <Status>{ngStatus('Opening your workspace…')}</Status>
+            {error !== undefined ? <ErrorText>{error}</ErrorText> : null}
+          </Panel>
+        ) : null}
       </Backdrop>
     );
   }

@@ -271,6 +271,21 @@ test('sign in on NextGraph\'s wallet page, then mirror a table both ways', async
   await register.waitForTimeout(3000);
   await register.close().catch(() => undefined);
 
+  // The app reports, correctly, that no AtomicServer answers: the dev config
+  // points it at a port nothing listens on (scripts/demo-up.sh), which is the
+  // claim. That toast is hidden in every frame from the first paint.
+  await page.addInitScript(() => {
+    const hide = () => {
+      const style = document.createElement('style');
+      style.textContent =
+        'div[style*="z-index: 9999"][style*="inset: 16px"] { display: none; }';
+      document.head.appendChild(style);
+    };
+
+    if (document.head) hide();
+    else document.addEventListener('DOMContentLoaded', hide);
+  });
+
   // 1 · The app hands over to the wallet at once ---------------------------
   await page.goto('/?ngbridge=1&ngengine=web');
   await page.waitForURL(url => url.origin === WALLET_ORIGIN, { timeout: 60_000 });
