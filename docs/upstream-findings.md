@@ -217,6 +217,46 @@ that needs no registered wallet (or documentation of the intended flow if it exi
 apps). Until then, a published form for someone with no account has to be served by something
 other than the web SDK.
 
+## 7d. Third-party mode: the published `@ng-org/web` sends an app to nextgraph.net, where a wallet made on nextgraph.eu is not found
+
+Tested 14 September 2026, `@ng-org/web` 0.1.2-alpha.14, in a fresh Chromium under Playwright.
+
+What the package does: `init()` on a top-level page sets `window.location.href` to
+`https://nextgraph.net/redir/#/?o=<app url>`. The host is a constant in the bundle, `nextgraph.net`,
+in every published version from alpha.1 to alpha.14; there is no option to change it.
+
+What happens there:
+
+- A browser with no wallet: the page says "We could not find a wallet in your browser. For now,
+  creating a new wallet while a Web App is authenticating, is not implemented. Please create or
+  import your wallet in a new tab by clicking here", and the link goes to `https://nextgraph.eu`.
+- On nextgraph.eu, "Login" offers "Import a Wallet File"; a `.ngw` made by the embedded engine
+  imports fine with its password and the wallet app opens. The wallet is stored under that origin
+  (`localStorage` keys `ng_wallets`, `ng_wallet_version`).
+- Back on `nextgraph.net/redir/`, same browser, same message: no wallet. Storage is per origin,
+  the redirect page has no frame or channel to nextgraph.eu (checked: no iframes, no postMessage
+  to it, no scripts or wasm loaded beyond the page itself), and it offers no way in of its own:
+  `nextgraph.net/redir/#/wallet/login` and `#/wallet/create` render "404 Page Not Found ... It has
+  probably not been implemented yet". `https://nextgraph.eu/redir/` answers 403.
+- Copying the two `localStorage` keys into the nextgraph.net origin by hand does not change the
+  answer. Disabling Chromium's third-party storage partitioning does not either.
+
+So a wallet a user creates or imports where NextGraph tells them to is not one the redirect page
+can see, and the hand-over stops before any session exists. Our June proof of concept
+(`joepio/elfa-tables-atomic`, README of 9 June) did complete this flow, with the auth page then on
+nextgraph.eu and wallet creation possible during auth; the hosted pages have changed since.
+
+Also observed on the way: from an https origin the wallet app cannot reach a broker on
+`ws://localhost` (connection error, mixed content), so the hosted wallet only ever talks to a
+broker with TLS. A local `ngd` is out of reach of this mode by design, which makes it untestable
+offline and in CI.
+
+**What we would ask:** one of (a) the redirect page able to import a wallet file or log in
+itself, (b) the wallet app's origin and the redirect page's origin being the same, or (c) the
+host configurable in `@ng-org/web` so an app can point at a wallet page of its own. Until one of
+those exists, the third-party mode is not something a partner can complete from the published
+packages, and our default engine is `web` with the embedded engine one query parameter away.
+
 ## 8. Smaller notes
 
 - The published wasm is a wasm-pack *bundler* target: its entry imports the `.wasm` directly and

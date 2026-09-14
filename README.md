@@ -42,7 +42,9 @@ Working, demonstrated, and honest about its edges.
 
 **What a partner trying it needs**: a NextGraph wallet at nextgraph.net. Open the app with
 `?ngbridge=1`, press "Continue with NextGraph", sign in on the wallet page, and the app comes back
-inside it with a session. With an embedded engine instead (`?ngengine=worker`), a broker that
+inside it with a session. As of 14 September that last step cannot be completed from the published
+packages: the redirect page at nextgraph.net does not see a wallet made on nextgraph.eu and cannot
+make one itself (`docs/upstream-findings.md` 7d), so the demo runs the embedded engine. With an embedded engine instead (`?ngengine=worker`), a broker that
 accepts the wallet is needed: the public one at `nextgraph.eu` refuses wallets it has not
 registered (`NEXTGRAPH-ISSUES.md` B3), so against it the NextGraph side is in-memory and gone on
 reload. Against a broker of our own everything persists: same wallet, same document, same data

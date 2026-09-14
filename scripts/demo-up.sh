@@ -13,10 +13,12 @@
 #      binds loopback only, so a socat forwarder in the same network namespace
 #      is what actually exposes it on the host port.
 #   2. atomic-server's data-browser dev server, on the branch with the bridge.
-#   3. The URL: `?ngbridge=1` turns the mirror on, `?ngbroker=` points wallet
-#      creation at our broker rather than nextgraph.eu, which refuses wallets
-#      it has not registered (B3). Both persist in localStorage, so the URL
-#      only needs its parameters the first time.
+#   3. The URL: `?ngbridge=1` turns the mirror on, `?ngengine=worker` picks
+#      the embedded engine over the hosted wallet (which cannot reach a local
+#      broker, upstream-findings 7d), `?ngbroker=` points wallet creation at
+#      our broker rather than nextgraph.eu, which refuses wallets it has not
+#      registered (B3). All three persist in localStorage, so the URL only
+#      needs its parameters the first time.
 set -euo pipefail
 
 # The docker CLI lives wherever the runtime put it, which a non-login shell
@@ -73,7 +75,7 @@ say "Broker: $BOOTSTRAP"
 # -- 3. App ------------------------------------------------------------------
 if ! curl -sf -m 3 -o /dev/null "$APP/"; then
   branch="$(git -C "$ATOMIC" branch --show-current)"
-  [ "$branch" = "feat/ng-bridge" ] || { echo "atomic-server is on '$branch', needs feat/ng-bridge"; exit 1; }
+  [ "$branch" = "ng-bridge" ] || { echo "atomic-server is on '$branch', needs ng-bridge"; exit 1; }
   say "Starting data-browser on :$APP_PORT (log: $LOGS/app.log)"
   # Fully detached: no fd of ours reaches vite, so a caller that pipes this
   # script's output is not held open by the dev server's children.
@@ -94,7 +96,7 @@ fi
 say "App:    $APP"
 
 echo
-say "Open:   $APP/?ngbridge=1&ngbroker=$BOOTSTRAP"
+say "Open:   $APP/?ngbridge=1&ngengine=worker&ngbroker=$BOOTSTRAP"
 echo
 echo "Reload test against this stack:"
 echo "  NG_BOOTSTRAP_URL=$BOOTSTRAP pnpm -C e2e demo"

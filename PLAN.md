@@ -144,7 +144,10 @@ below is one button. The transport seam did what it was kept for: the mirror did
 Atomic identity moves from wallet-derived to stored in the wallet's private store
 (`storedIdentity.ts`), because the app no longer holds wallet material. The embedded engines
 stay, selectable with `?ngengine=worker` or `page`, for a broker of one's own with no hosted page
-in the loop and for the e2e suite, which cannot sign in on a wallet page. The section as
+in the loop and for the e2e suite, which cannot sign in on a wallet page. Tested the same day:
+the hand-over reaches nextgraph.net, but that page does not see a wallet made on nextgraph.eu and
+cannot make one, so nobody can finish the flow from the published packages yet
+(`docs/upstream-findings.md` 7d). The demo therefore runs `?ngengine=worker`. The section as
 originally written follows; the reasoning still describes the embedded engines accurately.
 
 **We run the NextGraph engine ourselves, in our own app, by importing `@ng-org/lib-wasm`
