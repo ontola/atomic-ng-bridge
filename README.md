@@ -28,17 +28,26 @@ Working, demonstrated, and honest about its edges.
   no translation layer, nothing to keep in sync.
 - **Both directions.** Local edits reach the document; writes made into the document reach the app.
   Push and pull share one content-hash cursor, which is what stops them feeding each other.
-- **One secret.** The Atomic signing key is derived from the user's NextGraph wallet, so there is no
-  second identity to manage, and the same wallet gives the same identity on every device. A passkey
-  can hold the wallet password, so nothing is typed or stored in the clear.
+- **NextGraph's own sign-in.** By default the app runs as a NextGraph third-party app through
+  `@ng-org/web`: the wallet page at nextgraph.net signs the user in, holds the wallet and the
+  broker connection, and hands the app a session. The app never sees wallet material. Two embedded
+  engines remain for running against a broker of one's own with no hosted page in the loop
+  (`?ngengine=worker` or `page`).
+- **One secret.** There is no second identity to manage. With the hosted wallet, the Atomic signing
+  key is kept in the user's NextGraph private store, encrypted with the wallet and carried to every
+  device the wallet opens on. With an embedded engine it is derived from the wallet itself, and a
+  passkey can hold the wallet password.
 - **Containment.** A host app adds one dependency and one line. Every piece of NextGraph code lives
   in these packages. Dropping the mirror is reverting one commit.
 
-**What a partner trying it needs**: a broker that accepts their wallet. The public one at
-`nextgraph.eu` refuses wallets it has not registered (`NEXTGRAPH-ISSUES.md` B3), so against it the
-NextGraph side is in-memory and gone on reload. Against a broker of our own everything persists:
-same wallet, same document, same data after a reload, and `e2e/tests/resume.spec.ts` proves it on
-every run. `scripts/demo-up.sh` brings that broker up.
+**What a partner trying it needs**: a NextGraph wallet at nextgraph.net. Open the app with
+`?ngbridge=1`, press "Continue with NextGraph", sign in on the wallet page, and the app comes back
+inside it with a session. With an embedded engine instead (`?ngengine=worker`), a broker that
+accepts the wallet is needed: the public one at `nextgraph.eu` refuses wallets it has not
+registered (`NEXTGRAPH-ISSUES.md` B3), so against it the NextGraph side is in-memory and gone on
+reload. Against a broker of our own everything persists: same wallet, same document, same data
+after a reload, and `e2e/tests/resume.spec.ts` proves it on every run. `scripts/demo-up.sh` brings
+that broker up.
 
 **Can you run it from this repository alone? Not yet.** The bridge depends on `@tomic/lib`
 0.41.0-beta.2 and on the host app's mirror hooks, both of which live in an atomic-server branch that
@@ -60,7 +69,7 @@ resolved by the beta release of `@tomic/lib`, after which this runs from a clone
 
 ```
 packages/bridge      mapping + both sync directions + the bridge object. Pure, no wasm, no DOM.
-packages/ng-engine   the NextGraph engine: transport, wallet/session, wallet-derived identity.
+packages/ng-engine   the NextGraph engine: transport, session (hosted wallet or embedded), identity.
 packages/ui          the whole thing as one React component (sign-in, mirror, badge, passkey).
 apps/spike           harness for questions about the SDK rather than the product.
 e2e                  the demo, recorded.

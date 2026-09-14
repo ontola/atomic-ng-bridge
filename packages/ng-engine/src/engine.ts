@@ -18,14 +18,14 @@
 import type { NgEngineTransport } from './transport.js';
 import type { EngineRequest, OpenResult } from './worker/protocol.js';
 
-export type NgOpenParams = Extract<
-  EngineRequest,
-  { method: 'open' }
->['params'];
+export type NgOpenParams =
+  | Extract<EngineRequest, { method: 'open' }>['params']
+  /** The hosted wallet (`webEngine.ts`): no wallet of our own to open. */
+  | { kind: 'web' };
 
 export type NgEngineApi = {
   /** Which implementation this is. Reported in diagnostics, never branched on. */
-  readonly mode: 'page' | 'worker';
+  readonly mode: 'page' | 'worker' | 'web';
   /** Opens a wallet, starts a session, and connects to a broker. */
   open: (params: NgOpenParams) => Promise<OpenResult>;
   /** This app's document for the workspace, reopened or created. */

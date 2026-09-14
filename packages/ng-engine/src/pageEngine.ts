@@ -32,6 +32,10 @@ export function createPageEngine(): NgEngineApi {
     mode: 'page',
 
     open: async (params: NgOpenParams): Promise<OpenResult> => {
+      if (params.kind === 'web') {
+        throw new Error('The hosted wallet is `createWebEngine`, not this engine.');
+      }
+
       ng = (await import('@ng-org/lib-wasm')) as unknown as NgWasm;
 
       // Before any other SDK call, or every call hangs silently (A7).

@@ -48,6 +48,9 @@ importers:
 
   packages/ng-engine:
     dependencies:
+      '@ng-org/web':
+        specifier: 0.1.2-alpha.14
+        version: 0.1.2-alpha.14
       '@tomic/ng-bridge':
         specifier: workspace:*
         version: link:../bridge
@@ -295,6 +298,9 @@ packages:
   '@ng-org/lib-wasm@0.1.2-alpha.6':
     resolution: {integrity: sha512-aNTxqCBHTunlYULByJB87xVeqYkOWzdhcgObQ1tGGmBCxYNDcrVXPEiq/7eNPS9E4Gp/w/GmfepimsQKBydkYw==}
 
+  '@ng-org/web@0.1.2-alpha.14':
+    resolution: {integrity: sha512-FPQ7kyngMhAXK/WJtZ6pkoEJwGcau6GaBH2nhjjYorMq7OG//I+zwghat90FsIeMrfYsps0+5Y0UrRqfxNdUXA==}
+
   '@playwright/test@1.60.0':
     resolution: {integrity: sha512-O71yZIbAh/PxDMNGns37GHBIfrVkEVyn+AXyIa5dOTfb4/xNvRWV+Vv/NMbNCtODB/pO7vLlF2OTmMVLhmr7Ag==}
     engines: {node: '>=18'}
@@ -489,6 +495,9 @@ packages:
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
+
+  async-proxy@0.4.1:
+    resolution: {integrity: sha512-4e+zNtoGL4+cnqib8v169CnKcRfAsAubp2EsjBhAA5jyW7jjI3t36rVvuqLwmhtliwf8JvSnxinE4ecQN+DK4w==}
 
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
@@ -695,6 +704,9 @@ packages:
 
   nwsapi@2.2.25:
     resolution: {integrity: sha512-kktSgNDIbyEIs/LrE6dtEMnfzxSDpXViFl6c4gFjz/CgtnL4GDCR3wyZXzjvAXsNB8dXU4dAfvIOgLMH2/vwLg==}
+
+  object-path-operator@3.0.0:
+    resolution: {integrity: sha512-Z7dlPUeXqRU/lLfGerP24dPC66n7ehyXaTM81k71EFlsaaEjOHkf4/uq1WGicfGfiO7snYShneE1YZZUkyRiLQ==}
 
   parse5@7.3.0:
     resolution: {integrity: sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw==}
@@ -1086,6 +1098,10 @@ snapshots:
 
   '@ng-org/lib-wasm@0.1.2-alpha.6': {}
 
+  '@ng-org/web@0.1.2-alpha.14':
+    dependencies:
+      async-proxy: 0.4.1
+
   '@playwright/test@1.60.0':
     dependencies:
       playwright: 1.60.0
@@ -1228,6 +1244,10 @@ snapshots:
     optional: true
 
   assertion-error@2.0.1: {}
+
+  async-proxy@0.4.1:
+    dependencies:
+      object-path-operator: 3.0.0
 
   asynckit@0.4.0:
     optional: true
@@ -1491,6 +1511,8 @@ snapshots:
 
   nwsapi@2.2.25:
     optional: true
+
+  object-path-operator@3.0.0: {}
 
   parse5@7.3.0:
     dependencies:

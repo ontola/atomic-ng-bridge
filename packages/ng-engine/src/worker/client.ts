@@ -96,7 +96,13 @@ export function createWorkerEngine(options: WorkerEngineOptions): WorkerEngine {
   return {
     mode: 'worker',
 
-    open: params => call<OpenResult>({ method: 'open', params }),
+    open: params => {
+      if (params.kind === 'web') {
+        throw new Error('The hosted wallet is `createWebEngine`, not this engine.');
+      }
+
+      return call<OpenResult>({ method: 'open', params });
+    },
 
     findOrCreateDocument: (appClass, knownNuri, workspace) =>
       call<{ nuri: string; created: boolean }>({

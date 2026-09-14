@@ -31,6 +31,9 @@ const PROBE_PREDICATE = 'https://example.org/resume-probe';
 const PROBE_VALUE = 'written-before-the-reload';
 
 const BOOTSTRAP_KEY = 'atomic.ngBridge.bootstrapUrl';
+// These tests run the embedded engine against a local broker; the default
+// engine is the hosted wallet (`ngSession.ts`), which needs a person to sign in.
+const ENGINE_KEY = 'atomic.ngBridge.engine';
 
 type BridgeState = {
   graph: string;
@@ -112,8 +115,11 @@ test('the mirror resumes into the same document after a reload', async ({
 
   // Set before any app code runs, because wallet creation reads it once.
   await page.addInitScript(
-    ([key, url]) => localStorage.setItem(key as string, url as string),
-    [BOOTSTRAP_KEY, bootstrapUrl!],
+    ([key, url, engineKey]) => {
+      localStorage.setItem(key as string, url as string);
+      localStorage.setItem(engineKey as string, 'worker');
+    },
+    [BOOTSTRAP_KEY, bootstrapUrl!, ENGINE_KEY],
   );
 
   // 1 · Sign in, which creates this browser's wallet ------------------------

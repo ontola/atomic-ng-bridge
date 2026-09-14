@@ -41,6 +41,13 @@ export function createNgTransport(
 
   let subscription: { close?: () => void } | undefined;
 
+  // The wasm hands back an object with `close`; the hosted wallet's proxy
+  // hands back the close function itself. Either way, one thing to call.
+  const asSubscription = (handle: unknown): { close?: () => void } | undefined =>
+    typeof handle === 'function'
+      ? { close: handle as () => void }
+      : (handle as { close?: () => void } | undefined) ?? undefined;
+
   return {
     graph,
 
@@ -70,11 +77,9 @@ export function createNgTransport(
     },
 
     subscribe: async (callback: () => void): Promise<NgSubscription> => {
-      const handle = (await ng.doc_subscribe(graph, sessionId, () =>
-        callback(),
-      )) as { close?: () => void } | undefined;
-
-      subscription = handle ?? undefined;
+      subscription = asSubscription(
+        await ng.doc_subscribe(graph, sessionId, () => callback()),
+      );
 
       return {
         close: () => {

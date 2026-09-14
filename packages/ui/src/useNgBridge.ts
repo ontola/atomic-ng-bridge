@@ -4,7 +4,8 @@
  * Off unless asked for: `?ngbridge=1` in the URL, or `atomic.ngBridge` in
  * localStorage. The URL form sets the localStorage flag so it survives a
  * reload, which is what you want while demonstrating it. `?ngbroker=<url>`
- * does the same for the broker's bootstrap URL. Everything heavy
+ * does the same for the broker's bootstrap URL, and `?ngengine=web|worker|page`
+ * picks the engine (`ngSession.ts`). Everything heavy
  * (`attachNgBridge`, and through it the NextGraph engine) is behind a dynamic
  * import, so a normal session never loads a byte of it.
  */
@@ -24,6 +25,8 @@ import {
   walletPassword,
   type PasswordSource,
 } from './walletPassword.js';
+import { engineMode, setEngineMode } from './ngSession.js';
+import type { NgBridgeConnection } from './attachNgBridge';
 
 const FLAG_KEY = 'atomic.ngBridge';
 
@@ -74,6 +77,12 @@ function readFlag(): boolean {
 
     if (broker) {
       localStorage.setItem(BOOTSTRAP_URL_KEY, broker);
+    }
+
+    const engine = params.get('ngengine');
+
+    if (engine === 'web' || engine === 'worker' || engine === 'page') {
+      setEngineMode(engine);
     }
 
     if (params.get('ngbridge') === '1') {
@@ -191,13 +200,16 @@ export function useNgBridge(store: Store): NgBridgeState {
       try {
         const { attachNgBridge } = await import('./attachNgBridge');
 
+        // The hosted wallet needs no password: the wallet page holds it.
+        const connection: NgBridgeConnection =
+          engineMode() === 'web'
+            ? { kind: 'web' }
+            : { kind: 'public-broker', password: await walletPassword() };
+
         handle = await attachNgBridge({
           store,
           drive,
-          connection: {
-            kind: 'public-broker',
-            password: await walletPassword(),
-          },
+          connection,
           onStatus: report,
         });
 

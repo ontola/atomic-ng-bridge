@@ -21,6 +21,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 const NAME = 'https://atomicdata.dev/properties/name';
 const BOOTSTRAP_KEY = 'atomic.ngBridge.bootstrapUrl';
+// These tests run the embedded engine against a local broker; the default
+// engine is the hosted wallet (`ngSession.ts`), which needs a person to sign in.
+const ENGINE_KEY = 'atomic.ngBridge.engine';
 
 /** The rows typed into the table, in order: name, then author. */
 const BOOKS: [string, string][] = [
@@ -251,12 +254,16 @@ test('sign in with NextGraph, then mirror a table both ways', async ({
   // runs, because wallet creation reads it once.
   const bootstrapUrl = process.env.NG_BOOTSTRAP_URL;
 
-  if (bootstrapUrl !== undefined) {
-    await page.addInitScript(
-      ([key, url]) => localStorage.setItem(key as string, url as string),
-      [BOOTSTRAP_KEY, bootstrapUrl],
-    );
-  }
+  await page.addInitScript(
+    ([key, url, engineKey]) => {
+      if (url !== undefined) {
+        localStorage.setItem(key as string, url as string);
+      }
+
+      localStorage.setItem(engineKey as string, 'worker');
+    },
+    [BOOTSTRAP_KEY, bootstrapUrl, ENGINE_KEY],
+  );
 
   // 1 · The app, with nothing hosted behind it -----------------------------
   await page.goto('/?ngbridge=1');

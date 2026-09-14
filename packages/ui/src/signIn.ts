@@ -17,9 +17,11 @@
 
 import { StoreEvents, core, server, type Store } from '@tomic/lib';
 import { useWalletAgent } from './atomicAgent.js';
-import { ensureNgSession } from './ngSession.js';
+import { engineMode, ensureNgSession } from './ngSession.js';
 
 export type SignInSource =
+  /** The hosted wallet: NextGraph's own page signs the user in. */
+  | { kind: 'web' }
   /** Reuse the wallet saved in this browser, or make one if there is none. */
   | { kind: 'saved-or-new'; bootstrapUrl?: string }
   /** A `.ngw` the user brings. The real ELFA case: their existing identity. */
@@ -41,7 +43,9 @@ export type SignInResult = {
  */
 export async function signInWithWallet(
   store: Store,
-  source: SignInSource = { kind: 'saved-or-new' },
+  source: SignInSource = engineMode() === 'web'
+    ? { kind: 'web' }
+    : { kind: 'saved-or-new' },
   report: (message: string) => void = () => undefined,
 ): Promise<SignInResult> {
   const { session, created } = await ensureNgSession(source, report);

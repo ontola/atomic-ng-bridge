@@ -134,6 +134,19 @@ Note that the published `lib-wasm` (alpha.6) currently lags the published `web` 
 
 ## 4. Architecture decision: embedded engine, no iframe
 
+**Revised 14 September 2026.** The hosted wallet is now the default engine (`webEngine.ts`,
+`ngSession.ts`). NextGraph's technical coordinator asked on 10 and 12 September that apps outside
+the shell take their session from `@ng-org/web`, the mode NextGraph documents for third-party
+apps, rather than open a wallet themselves; the shell's own session package, `api-web`, is private
+to NextGraph's repository and will not be published. So the app now hands over to nextgraph.net,
+which signs the user in and loads the app inside its frame with a session, and the sign-in panel
+below is one button. The transport seam did what it was kept for: the mirror did not change. The
+Atomic identity moves from wallet-derived to stored in the wallet's private store
+(`storedIdentity.ts`), because the app no longer holds wallet material. The embedded engines
+stay, selectable with `?ngengine=worker` or `page`, for a broker of one's own with no hosted page
+in the loop and for the e2e suite, which cannot sign in on a wallet page. The section as
+originally written follows; the reasoning still describes the embedded engines accurately.
+
 **We run the NextGraph engine ourselves, in our own app, by importing `@ng-org/lib-wasm`
 directly.** No hosted wallet UI, no top-level redirect, no iframe.
 
@@ -176,7 +189,8 @@ change and does not touch the mapping or the sync logic.
   NgTransport  (query / update / subscribe / close)
     |
     v
-  @tomic/ng-engine  ->  @ng-org/lib-wasm  ->  NextGraph document (named graph)
+  @tomic/ng-engine  ->  @ng-org/web (hosted wallet, default)   ->  NextGraph document (named graph)
+                    ->  @ng-org/lib-wasm (embedded, opt-in)   ->
 ```
 
 The honest structural description: this is a **mirror**, not a single shared store. Two systems,
@@ -735,7 +749,7 @@ Record exact versions here whenever they change, because skew failures are silen
 | `@tomic/lib` | `link:../../../atomic-server/browser/lib` (0.41.0-beta.2) | **not published.** npm's latest is `0.40.0`, latest beta `0.41.0-beta.0`, and that beta predates the `lorodoc` and `localizedText` datatypes this mapping needs (`PropVals` is also still `Map<string, JSONValue>` there). We develop against the local build. Nothing ships until this is published. |
 | `@ng-org/lib-wasm` | `0.1.2-alpha.6` | published; lags its siblings. A CI test greps its typings for every method we call, so a bump that renames one fails there rather than silently at runtime (A4). |
 | `@playwright/test` | `1.60.0` | e2e only, matching `atomic-server/browser/e2e` |
-| `@ng-org/web` | not used | iframe path, rejected in section 4 |
+| `@ng-org/web` | 0.1.2-alpha.14 | the hosted wallet, default engine since 14 Sept (section 4) |
 | `@ng-org/orm` | not used | generic triples instead, see section 5 |
 
 ## 11. Running it

@@ -1,16 +1,24 @@
 /**
  * "Continue with NextGraph" — the whole sign-in, as one panel.
  *
- * Shown when the mirror is enabled and nobody is signed in. Everything the user
- * needs is here: use the wallet this browser already has, bring a `.ngw`, or
- * get a NextGraph identity if they have none. Nothing about Atomic agents, DIDs
- * or keys appears, because none of it is theirs to manage.
+ * Shown when the mirror is enabled and nobody is signed in. With the hosted
+ * wallet (the default engine) it is one button: the app hands over to
+ * NextGraph's wallet page at nextgraph.net, which signs the user in and loads
+ * this app inside it with a session. Inside that frame the panel does not
+ * wait for a click; the session is already there.
+ *
+ * With an embedded engine, everything the user needs is here instead: use the
+ * wallet this browser already has, bring a `.ngw`, or get a NextGraph identity
+ * if they have none. Nothing about Atomic agents, DIDs or keys appears in
+ * either case, because none of it is theirs to manage.
  */
 
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import type { Store } from '@tomic/lib';
 import { styled } from 'styled-components';
+import { insideHostedWallet } from '@tomic/ng-engine';
 import { ngStatus } from './status.js';
+import { engineMode } from './ngSession.js';
 import { ensureWorkspace, signInWithWallet, type SignInSource } from './signIn.js';
 import { loadWallet } from './walletStorage.js';
 
@@ -31,10 +39,13 @@ export function NgSignIn({
   const [busy, setBusy] = useState<string | undefined>();
   const [error, setError] = useState<string | undefined>();
   const fileInput = useRef<HTMLInputElement>(null);
+  const hosted = engineMode() === 'web';
 
   useEffect(() => {
-    void loadWallet().then(saved => setHasSaved(saved !== undefined));
-  }, []);
+    if (!hosted) {
+      void loadWallet().then(saved => setHasSaved(saved !== undefined));
+    }
+  }, [hosted]);
 
   const run = useCallback(
     async (source: SignInSource) => {
@@ -53,6 +64,16 @@ export function NgSignIn({
     },
     [store, onSignedIn, workspaceName],
   );
+
+  // Inside the wallet's frame the user has already signed in on the wallet
+  // page; asking them to click again would be asking twice.
+  useEffect(() => {
+    if (hosted && insideHostedWallet()) {
+      void run({ kind: 'web' });
+    }
+    // Once, on mount: `run` is stable for the life of the panel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hosted]);
 
   const onFile = useCallback(
     async (file: File) => {
@@ -78,6 +99,12 @@ export function NgSignIn({
 
         {busy !== undefined ? (
           <Status>{busy}</Status>
+        ) : hosted ? (
+          <Actions>
+            <Primary type='button' onClick={() => void run({ kind: 'web' })}>
+              {ngStatus('Continue with NextGraph')}
+            </Primary>
+          </Actions>
         ) : (
           <Actions>
             <Primary
@@ -115,9 +142,13 @@ export function NgSignIn({
         {error !== undefined ? <ErrorText>{error}</ErrorText> : null}
 
         <Fine>
-          {ngStatus(
-            'Your workspace lives on this device and is mirrored into NextGraph while the app is open.',
-          )}
+          {hosted
+            ? ngStatus(
+                'You sign in on nextgraph.net, in your own wallet. This app then runs inside it, and your workspace is mirrored into NextGraph while it is open.',
+              )
+            : ngStatus(
+                'Your workspace lives on this device and is mirrored into NextGraph while the app is open.',
+              )}
         </Fine>
       </Panel>
     </Backdrop>

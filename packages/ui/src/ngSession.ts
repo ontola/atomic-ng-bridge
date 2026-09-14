@@ -18,7 +18,9 @@
 
 import {
   createPageEngine,
+  createWebEngine,
   createWorkerEngine,
+  insideHostedWallet,
   spawnEngineWorker,
   type NgEngineApi,
   type OpenResult,
@@ -51,15 +53,37 @@ const INVITATION_KEY = 'atomic.ngBridge.invitation';
 const BOOTSTRAP_URL_KEY = 'atomic.ngBridge.bootstrapUrl';
 
 /**
- * Set to `page` to run the wasm on the main thread instead of in a worker.
+ * Which engine runs NextGraph: `web`, `worker` or `page`.
  *
- * The worker is the default because every SPARQL call runs synchronously inside
- * the wasm, and on the main thread that competes with the app's rendering and
- * with Atomic's own Loro work — which froze the tab twice while this was built.
- * The escape hatch exists because a host bundler that cannot build a wasm
- * worker would otherwise have no way to run at all.
+ * `web` is the default: NextGraph's own hosted wallet at nextgraph.net owns
+ * the wallet, the session and the broker, and this app runs inside it as a
+ * third-party app, the mode NextGraph documents for apps outside its shell.
+ * Nothing about wallets, passwords or brokers is handled here in that mode.
+ *
+ * `worker` and `page` embed the engine in this app instead, for a broker of
+ * one's own with no hosted page in the loop. The worker keeps SPARQL off the
+ * main thread, where it froze the tab twice while this was built; `page` is
+ * for a host bundler that cannot build a wasm worker.
  */
 const ENGINE_MODE_KEY = 'atomic.ngBridge.engine';
+
+export type NgEngineMode = 'web' | 'worker' | 'page';
+
+/** The configured engine, `web` unless `atomic.ngBridge.engine` says otherwise. */
+export function engineMode(): NgEngineMode {
+  const value = configured(ENGINE_MODE_KEY);
+
+  return value === 'worker' || value === 'page' ? value : 'web';
+}
+
+/** Persists the engine choice; `?ngengine=` in the URL goes through here. */
+export function setEngineMode(mode: NgEngineMode): void {
+  try {
+    localStorage.setItem(ENGINE_MODE_KEY, mode);
+  } catch {
+    // Storage unavailable: the default applies.
+  }
+}
 
 function configured(key: string): string | undefined {
   try {
@@ -70,6 +94,8 @@ function configured(key: string): string | undefined {
 }
 
 export type WalletSource =
+  /** The hosted wallet: NextGraph's own page signs the user in. */
+  | { kind: 'web' }
   /** Reuse the wallet saved in this browser; create one if there is none. */
   | { kind: 'saved-or-new'; bootstrapUrl?: string }
   /** A `.ngw` the user brings. */
@@ -89,7 +115,9 @@ let current: Promise<NgSessionHandle> | undefined;
 
 /** The session, opening one if nobody has yet. */
 export function ensureNgSession(
-  source: WalletSource = { kind: 'saved-or-new' },
+  source: WalletSource = engineMode() === 'web'
+    ? { kind: 'web' }
+    : { kind: 'saved-or-new' },
   report: (message: string) => void = () => undefined,
 ): Promise<NgSessionHandle> {
   current ??= acquire(source, report).catch(error => {
@@ -111,7 +139,15 @@ export const resetNgSession = (): void => {
 };
 
 function createEngine(report: (message: string) => void): NgEngineApi {
-  if (configured(ENGINE_MODE_KEY) === 'page') {
+  const mode = engineMode();
+
+  if (mode === 'web') {
+    report(ngStatus('Connecting to your NextGraph wallet…'));
+
+    return createWebEngine();
+  }
+
+  if (mode === 'page') {
     report(ngStatus('Loading NextGraph engine…'));
 
     return createPageEngine();
@@ -142,6 +178,23 @@ async function acquire(
   const engine = createEngine(report);
   // A worker has no `window.location`, so the page supplies it.
   const location = window.location.href;
+
+  if (source.kind === 'web' || engine.mode === 'web') {
+    // On a top-level page this navigates to the wallet and never returns;
+    // inside the wallet's frame it resolves with the session. The wallet
+    // reloads this app at the URL it was given, in a frame whose storage is
+    // its own, so the flag that turned the mirror on has to travel in the URL
+    // rather than in localStorage, or the frame comes up with the mirror off.
+    if (!insideHostedWallet()) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('ngbridge', '1');
+      history.replaceState(history.state, '', url);
+    }
+
+    const session = await engine.open({ kind: 'web' });
+
+    return { engine, session, created: session.created };
+  }
 
   if (source.kind === 'wallet-file') {
     report(ngStatus('Opening your wallet…'));

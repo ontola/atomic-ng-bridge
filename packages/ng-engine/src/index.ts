@@ -6,6 +6,8 @@ export * from './session.js';
 export * from './identity.js';
 export * from './engine.js';
 export * from './pageEngine.js';
+export * from './webEngine.js';
+export * from './storedIdentity.js';
 export * from './worker/client.js';
 export * from './worker/openSession.js';
 export * from './worker/protocol.js';

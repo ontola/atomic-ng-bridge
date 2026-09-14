@@ -1,7 +1,7 @@
 {
   "name": "@tomic/ng-engine",
   "version": "0.1.0",
-  "description": "NgTransport backed by @ng-org/lib-wasm: wallet, session, SPARQL, subscriptions",
+  "description": "NgTransport over @ng-org/lib-wasm or the hosted wallet (@ng-org/web): session, SPARQL, subscriptions",
   "type": "module",
   "main": "./src/index.ts",
   "exports": {
@@ -17,6 +17,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ng-org/web": "0.1.2-alpha.14",
     "@tomic/ng-bridge": "workspace:*"
   },
   "devDependencies": {

@@ -67,6 +67,8 @@ const APP_CLASS = 'did:ng:z:AtomicDriveMirror';
 const BROKER_BOOTSTRAP_URL = 'https://nextgraph.eu/.ng_bootstrap';
 
 export type NgBridgeConnection =
+  /** The hosted wallet at nextgraph.net: the default. */
+  | { kind: 'web' }
   | {
       /** Create a throwaway wallet against a broker's published bootstrap. */
       kind: 'public-broker';
@@ -158,13 +160,15 @@ export async function attachNgBridge(
   // Shared with sign-in: one wallet per page, or the page ends up with two
   // identities and a document neither can reach (see `ngSession.ts`).
   const { engine, session } = await ensureNgSession(
-    connection.kind === 'wallet-file'
-      ? {
-          kind: 'wallet-file',
-          walletFile: connection.walletFile,
-          password: connection.password,
-        }
-      : { kind: 'saved-or-new', bootstrapUrl: connection.bootstrapUrl },
+    connection.kind === 'web'
+      ? { kind: 'web' }
+      : connection.kind === 'wallet-file'
+        ? {
+            kind: 'wallet-file',
+            walletFile: connection.walletFile,
+            password: connection.password,
+          }
+        : { kind: 'saved-or-new', bootstrapUrl: connection.bootstrapUrl },
     report,
   );
 
