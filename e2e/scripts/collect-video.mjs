@@ -17,11 +17,13 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const artifacts = join(here, '..', 'artifacts');
 const outDir = join(here, '..', '..', 'docs');
-const out = join(outDir, 'ng-bridge-demo.mp4');
+// `DEMO_NAME` names the output, so a second demo does not overwrite the first.
+const name = process.env.DEMO_NAME ?? 'ng-bridge-demo';
+const out = join(outDir, `${name}.mp4`);
 // GitHub will not play a repo-relative mp4 inline, so the README embeds a GIF
 // of the same recording and links it to the mp4. Both come from one run so
 // they cannot drift.
-const gif = join(outDir, 'ng-bridge-demo.gif');
+const gif = join(outDir, `${name}.gif`);
 
 function newestVideo(root) {
   if (!existsSync(root)) {

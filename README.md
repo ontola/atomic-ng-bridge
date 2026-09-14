@@ -8,6 +8,15 @@ as ordinary RDF — and comes back the other way.
 Built for ELFA's WP6 question: can Atomic's mature Tables / Forms / Kanban work *on* NextGraph
 without rebuilding them, and without anyone hosting anything?
 
+[![Hand over to NextGraph's own wallet page, sign in there, come back inside it, type rows into a table, watch them land in the NextGraph document, then rename one from the NextGraph side](docs/ng-bridge-hosted-demo.gif)](docs/ng-bridge-hosted-demo.mp4)
+
+*Fifty seconds, unedited, through NextGraph's own hosted wallet (its third-party mode): the app
+hands over to the wallet page, the wallet opens and hands back a session, and the app runs inside
+the wallet's frame from then on. Then the same mirror as below: a table typed into the app appears
+in the NextGraph document, and a rename made in the document comes back into the grid. Click
+through for the mp4; `e2e/tests/hosted-demo.spec.ts` recorded it, against the stack
+`scripts/ng-hosted-up.sh` brings up.*
+
 [![Sign in with a NextGraph wallet, type rows into a table, watch them land in the NextGraph document, then rename one from the NextGraph side](docs/ng-bridge-demo.gif)](docs/ng-bridge-demo.mp4)
 
 *Forty seconds, unedited: a NextGraph wallet as the only identity, a table typed into the app,
