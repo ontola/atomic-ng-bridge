@@ -14,8 +14,8 @@
 #      is what actually exposes it on the host port.
 #   2. atomic-server's data-browser dev server, on the branch with the bridge.
 #   3. The URL: `?ngbridge=1` turns the mirror on, `?ngengine=worker` picks
-#      the embedded engine over the hosted wallet (which cannot reach a local
-#      broker, upstream-findings 7d), `?ngbroker=` points wallet creation at
+#      the embedded engine over the hosted wallet (for the hosted wallet with
+#      this broker, run scripts/ng-hosted-up.sh after this), `?ngbroker=` points wallet creation at
 #      our broker rather than nextgraph.eu, which refuses wallets it has not
 #      registered (B3). All three persist in localStorage, so the URL only
 #      needs its parameters the first time.

@@ -217,45 +217,51 @@ that needs no registered wallet (or documentation of the intended flow if it exi
 apps). Until then, a published form for someone with no account has to be served by something
 other than the web SDK.
 
-## 7d. Third-party mode: the published `@ng-org/web` sends an app to nextgraph.net, where a wallet made on nextgraph.eu is not found
+## 7d. Third-party mode: works from the monorepo's dev mode; the published `@ng-org/web` needs a wallet on a public broker
 
-Tested 14 September 2026, `@ng-org/web` 0.1.2-alpha.14, in a fresh Chromium under Playwright.
+Tested 14 September 2026 with Playwright, `@ng-org/web` 0.1.2-alpha.14 and the monorepo at
+213338f6 (16 May 2026).
 
-What the package does: `init()` on a top-level page sets `window.location.href` to
-`https://nextgraph.net/redir/#/?o=<app url>`. The host is a constant in the bundle, `nextgraph.net`,
-in every published version from alpha.1 to alpha.14; there is no option to change it.
+**What the hand-over is.** `init()` on a top-level page navigates to a redirect page
+(`infra/ngnet/redir`), whose host is a constant baked into the SDK at build time: `nextgraph.net`
+in every published version since alpha.1, `localhost:1421` when the SDK is built with
+`NG_DEV_LOCAL_BROKER=1`. The redirect page does not hold wallets. It holds a list of brokers
+(`localStorage` key `ng_bootstrap`), picks one, and frames that broker's auth page
+(`engine/broker/auth`, `<broker>/auth/`, or `localhost:1421/appauth.html` in dev). The auth page is
+where the wallet lives and is opened, and it is the auth page that hands the app its session over
+`postMessage`. A wallet app registers its broker with the redirect page by opening
+`<redirect host>/bootstrap/#/?b=<brokers>&m=add` in a popup when a wallet is imported.
 
-What happens there:
+**With the published SDK, against nextgraph.net.** The bootstrap page accepts a registration only
+when the broker matches the origin that sent it: a `localhost` broker from a `localhost` wallet app,
+a domain broker from that domain, and only domains on its list. A wallet imported at nextgraph.eu
+that lives on a local broker is refused with "mismatch between origin and msg", and the redirect
+page then shows "We could not find a wallet in your browser ... creating a new wallet while a Web
+App is authenticating, is not implemented", with no way in. So from the published packages the
+hand-over completes only for a wallet registered on a listed public broker such as nextgraph.eu,
+which needs an account there. A local `ngd` cannot take part, which also keeps this mode out of
+CI. The popup itself is blocked by browsers unless the import came from a user gesture; in
+Playwright it opened, so that is not the cause.
 
-- A browser with no wallet: the page says "We could not find a wallet in your browser. For now,
-  creating a new wallet while a Web App is authenticating, is not implemented. Please create or
-  import your wallet in a new tab by clicking here", and the link goes to `https://nextgraph.eu`.
-- On nextgraph.eu, "Login" offers "Import a Wallet File"; a `.ngw` made by the embedded engine
-  imports fine with its password and the wallet app opens. The wallet is stored under that origin
-  (`localStorage` keys `ng_wallets`, `ng_wallet_version`).
-- Back on `nextgraph.net/redir/`, same browser, same message: no wallet. Storage is per origin,
-  the redirect page has no frame or channel to nextgraph.eu (checked: no iframes, no postMessage
-  to it, no scripts or wasm loaded beyond the page itself), and it offers no way in of its own:
-  `nextgraph.net/redir/#/wallet/login` and `#/wallet/create` render "404 Page Not Found ... It has
-  probably not been implemented yet". `https://nextgraph.eu/redir/` answers 403.
-- Copying the two `localStorage` keys into the nextgraph.net origin by hand does not change the
-  answer. Disabling Chromium's third-party storage partitioning does not either.
+**With the monorepo's dev mode, everything on localhost.** `pnpm buildfrontdev` builds the redirect,
+auth and bootstrap pages into the wallet app's `public_dev` and the SDK with
+`NG_DEV_LOCAL_BROKER=1`; `pnpm -C app/nextgraph webdev` serves them on 1421 (lib-wasm has to be
+built first with wasm-pack). With the host app resolving `@ng-org/web` to that build, the flow
+completes: Continue with NextGraph → `localhost:1421/redir.html` → broker "Local port 14400" →
+`appauth.html` "Opening Wallet for localhost:6756" → Login → Import a Wallet File → password →
+"Wallet opened for localhost:6756" → the app is loaded in the auth page's frame, creates its
+workspace, and `window.__ngBridge` in that frame reports `mode: web`, `identity: wallet`,
+`NextGraph: Live` with a document nuri. The mirror above the transport did not change for this.
+`scripts/ng-hosted-up.sh` builds and starts that stack.
 
-So a wallet a user creates or imports where NextGraph tells them to is not one the redirect page
-can see, and the hand-over stops before any session exists. Our June proof of concept
-(`joepio/elfa-tables-atomic`, README of 9 June) did complete this flow, with the auth page then on
-nextgraph.eu and wallet creation possible during auth; the hosted pages have changed since.
+Two things a partner has to know: the redirect page must be told about the broker before it can
+show a login at all (the script prints the bootstrap URL that does it), and the wallet app in that
+checkout (`app/nextgraph`) is the shell skeleton, so the auth page is the only login UI on 1421,
+which is fine because it has the full one.
 
-Also observed on the way: from an https origin the wallet app cannot reach a broker on
-`ws://localhost` (connection error, mixed content), so the hosted wallet only ever talks to a
-broker with TLS. A local `ngd` is out of reach of this mode by design, which makes it untestable
-offline and in CI.
-
-**What we would ask:** one of (a) the redirect page able to import a wallet file or log in
-itself, (b) the wallet app's origin and the redirect page's origin being the same, or (c) the
-host configurable in `@ng-org/web` so an app can point at a wallet page of its own. Until one of
-those exists, the third-party mode is not something a partner can complete from the published
-packages, and our default engine is `web` with the embedded engine one query parameter away.
+**What we would ask:** the redirect host as a runtime option of `@ng-org/web` rather than a build
+constant, so a self-hosted broker can serve its own redirect page and a partner does not need a
+nextgraph.eu account or a monorepo build to run the third-party mode.
 
 ## 8. Smaller notes
 
